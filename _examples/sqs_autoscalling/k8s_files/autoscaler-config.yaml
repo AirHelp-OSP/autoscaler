@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: autoscaler-config
+  namespace: autoscaler-example
+data:
+  sqs-deployment: |
+    minimum_number_of_pods: 0
+    maximum_number_of_pods: 3
+    check_interval: 15s
+    cooldown_period: 60s
+    threshold: 20
+    sqs:
+      queues:
+        - autoscaler-example-queue

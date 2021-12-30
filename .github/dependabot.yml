@@ -1,0 +1,15 @@
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    labels:
+      - dependabot
+    schedule:
+      interval: daily
+  - package-ecosystem: docker
+    directory: "/"
+    labels:
+      - dependabot
+    schedule:
+      interval: daily

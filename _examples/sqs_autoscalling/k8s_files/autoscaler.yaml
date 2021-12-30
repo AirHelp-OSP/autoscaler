@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: autoscaler
+  namespace: autoscaler-example
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: autoscaler-role
+  namespace: autoscaler-example
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "describe", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["autoscaler-config"]
+    verbs: ["get", "describe"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: autoscaler-role-binding
+  namespace: autoscaler-example
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: autoscaler-role
+subjects:
+  - kind: ServiceAccount
+    name: autoscaler
+    namespace: autoscaler-example
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscaler
+  namespace: autoscaler-example
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      tool: autoscaler
+  template:
+    metadata:
+      labels:
+        tool: autoscaler
+        namespace: autoscaler-example
+    spec:
+      serviceAccountName: autoscaler
+      containers:
+        - name: autoscaler
+          image: airhelp/autoscaler:latest
+          imagePullPolicy: Always
+          command: ["./autoscaler"]
+          args: [
+            "-v",
+            "--namespace", "autoscaler-example",
+            "--environment", "development",
+            "--cluster_name", "$(CLUSTER_NAME)"
+          ]
+          env:
+            - name: AWS_REGION
+              value: eu-west-1
+          envFrom:
+            - secretRef:
+                name: autoscaler-example-credentials
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi

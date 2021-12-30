@@ -1,0 +1,9 @@
+minimum_number_of_pods: 1
+maximum_number_of_pods: 99
+check_interval: 5s
+cooldown_period: 900s
+threshold: 50
+nginx:
+  timeout: 1s
+  consecutive_reads: 3
+  statistic: average

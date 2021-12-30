@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqs-deployment
+  namespace: autoscaler-example
+spec:
+  selector:
+    matchLabels:
+      app: sqs-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sqs-app
+    spec:
+      containers:
+        - name: sqs-ubuntu
+          image: ubuntu
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sleep"]
+          args: ["1000000000"]

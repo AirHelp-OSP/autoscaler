@@ -1,0 +1,8 @@
+minimum_number_of_pods: 1
+maximum_number_of_pods: 99
+check_interval: 5s
+cooldown_period: 900s
+threshold: 50
+sqs:
+  queues:
+    - q1

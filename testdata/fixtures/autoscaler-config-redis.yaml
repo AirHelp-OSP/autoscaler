@@ -1,0 +1,12 @@
+minimum_number_of_pods: 1
+maximum_number_of_pods: 99
+check_interval: 5s
+cooldown_period: 900s
+threshold: 50
+redis:
+  hosts:
+    - localhost:6379
+  list_keys:
+    - key1
+    - key2
+    - keys3
