@@ -3,8 +3,8 @@ module github.com/AirHelp/autoscaler
 go 1.20
 
 require (
-	github.com/alicebob/miniredis/v2 v2.30.3
-	github.com/aws/aws-sdk-go v1.47.4
+	github.com/alicebob/miniredis/v2 v2.31.0
+	github.com/aws/aws-sdk-go v1.44.282
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/onsi/ginkgo v1.16.5
