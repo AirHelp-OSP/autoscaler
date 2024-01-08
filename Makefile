@@ -8,10 +8,10 @@ generate:
 	go generate ./...
 
 build:
-	docker build -t airhelp/autoscaler:$(VERSION) .
+	docker build -t ghcr.io/airhelp-osp/autoscaler:$(VERSION) .
 
 release: build
-	docker push airhelp/autoscaler:$(VERSION)
+	docker push ghcr.io/airhelp-osp/autoscaler:$(VERSION)
 
-	docker tag airhelp/autoscaler:$(VERSION) airhelp/autoscaler:latest
-	docker push airhelp/autoscaler:latest
+	docker tag ghcr.io/airhelp-osp/autoscaler:$(VERSION) ghcr.io/airhelp-osp/autoscaler:latest
+	docker push ghcr.io/airhelp-osp/autoscaler:latest
