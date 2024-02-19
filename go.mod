@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.8
 	github.com/sirupsen/logrus v1.9.3
-	github.com/slack-go/slack v0.12.2
+	github.com/slack-go/slack v0.12.4
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
