@@ -3,7 +3,7 @@ module github.com/AirHelp/autoscaler
 go 1.21
 
 require (
-	github.com/alicebob/miniredis/v2 v2.31.0
+	github.com/alicebob/miniredis/v2 v2.32.1
 	github.com/aws/aws-sdk-go v1.44.282
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
@@ -49,7 +49,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/yuin/gopher-lua v1.1.0 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
