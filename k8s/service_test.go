@@ -3,7 +3,7 @@ package k8s
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
