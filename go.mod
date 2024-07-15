@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/alicebob/miniredis/v2 v2.31.0
-	github.com/aws/aws-sdk-go v1.44.282
+	github.com/aws/aws-sdk-go v1.54.19
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/onsi/ginkgo/v2 v2.15.0
