@@ -8,15 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type NginxClient struct {
 	endpoint string
-	logger   *log.Entry
 }
 
-func NewClient(endpoint string, logger *log.Entry) (*NginxClient, error) {
+func NewClient(endpoint string) (*NginxClient, error) {
 	return &NginxClient{
 		endpoint: endpoint,
 	}, nil
@@ -37,7 +36,7 @@ func (c *NginxClient) GetActiveConnections(ctx context.Context, ip string) (int,
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			c.logger.WithError(err).Error("failed to close response body")
+			zap.S().Error("failed to close response body")
 		}
 	}()
 

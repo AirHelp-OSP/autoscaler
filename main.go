@@ -11,75 +11,74 @@ import (
 
 	"github.com/AirHelp/autoscaler/config"
 	"github.com/AirHelp/autoscaler/k8s"
+	"github.com/AirHelp/autoscaler/logger"
 	"github.com/AirHelp/autoscaler/notification"
 	"github.com/AirHelp/autoscaler/notification/slack"
 	"github.com/AirHelp/autoscaler/scaler"
-	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
+
+	"go.uber.org/zap"
 )
 
-const configMapName = "autoscaler-config"
+const (
+	configMapName = "autoscaler-config"
+)
+
+var cfg config.Config
 
 type ScalerEntity interface {
 	Start(context.Context)
 }
 
 func init() {
-	log.SetFormatter(&log.JSONFormatter{})
-	log.SetOutput(os.Stdout)
-	log.SetLevel(log.InfoLevel)
+	cfg = parseStartingFlags()
+	logLevel := "info"
+	if cfg.Verbose {
+		logLevel = "debug"
+	}
+	log.InitLogger(cfg.Namespace, cfg.Environment, logLevel)
 }
 
 func main() {
-	cfg := parseStartingFlags()
-
 	if cfg.Version {
 		fmt.Println(versionString())
 		os.Exit(0)
 	}
 
-	log.Infof("Autoscaler starting, version: %v", strings.TrimSpace(version))
+	zap.S().Infof("autoscaler starting, version: %v", strings.TrimSpace(version))
 
 	if cfg.Verbose {
-		log.Info("Starting autoscaler with verbose logging mode")
-		log.SetLevel(log.DebugLevel)
+		zap.S().Info("running in verbose logging mode")
 	}
-
-	logger := log.WithFields(log.Fields{
-		"namespace":   cfg.Namespace,
-		"environment": cfg.Environment,
-	})
 
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logger.Debug("Initializing k8s client and config")
-	k8sSvc, err := k8s.New(cfg.Namespace, logger)
-
+	zap.S().Debug("initializing k8s client and config")
+	k8sSvc, err := k8s.New(cfg.Namespace)
 	if err != nil {
-		logger.WithError(err).Error("Failed to initialize k8s client")
+		zap.S().Errorf("failed to initialize K8s client: %v", err)
 		panic(err)
 	}
-	logger.Debug("Successfully initialized k8s client and config")
+	zap.S().Debug("successfully initialized k8s client and config")
 
 	configMap, err := k8sSvc.GetConfigMap(ctx, configMapName)
-
 	if err != nil {
-		logger.WithError(err).Error("Error getting autoscaler configmap")
+		zap.S().Errorf("failed to get autoscaler configmap: %v", err)
 		panic(err)
 	}
 
 	var notifiers []notification.Notifier
 
 	if cfg.SlackWebhookUrl != "" {
-		logger.Debug("Initializing Slack client")
+		zap.S().Debug("initializing Slack client")
 		notifiers = append(notifiers, slack.NewClient(cfg.SlackWebhookUrl, cfg.SlackChannel, cfg.ClusterName, "autoscaler"))
-		logger.Debug("Done initializing Slack client")
+		zap.S().Debug("slack client initialized successfully")
 	}
 
-	logger.Debug("Initializing scalers on all enabled deployments")
+	zap.S().Debug("initializing scalers on the all enabled deployments")
 
 	waitGroup := sync.WaitGroup{}
 
@@ -93,11 +92,10 @@ func main() {
 			Notifiers:      notifiers,
 			K8sService:     k8sSvc,
 			GlobalConfig:   cfg,
-			Logger:         logger,
 		})
 
 		if err != nil {
-			logger.WithError(err).Error(fmt.Sprintf("Failed to initialize autoscaler for %v, skipping.", deployment))
+			zap.S().Errorf("failed to initialize autoscaler for %v: %v, skipping", deployment, err)
 			continue
 		}
 
@@ -109,14 +107,14 @@ func main() {
 		waitGroup.Add(1)
 	}
 
-	logger.Debug("Done initializing scalers on all enabled deployments")
+	zap.S().Debug("initializing scalers on the all enabled deployments")
 
 	<-interruptChan
 	cancel()
 
 	waitGroup.Wait()
 
-	logger.Info("Received shutdown, shutting down")
+	zap.S().Info("received shutdown, shutting down")
 }
 
 func parseStartingFlags() config.Config {

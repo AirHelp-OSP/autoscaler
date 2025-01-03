@@ -7,7 +7,7 @@ import (
 	"github.com/AirHelp/autoscaler/probe/nginx"
 	"github.com/AirHelp/autoscaler/probe/redis"
 	"github.com/AirHelp/autoscaler/probe/sqs"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type MinMaxConfig struct {
@@ -51,9 +51,9 @@ func NewScalerConfigWithDefaults() Config {
 // Export `now` function to variable - make it available for stubbing in tests while not having massive hacks on code level
 var now = time.Now
 
-func (sc Config) ApplicableLimits(l *log.Entry) MinMaxConfig {
+func (sc Config) ApplicableLimits() MinMaxConfig {
 	if len(sc.HourlyConfig) == 0 {
-		l.Debug("No hourly configs defined, applying default")
+		zap.S().Debug("no hourly configs defined, applying default")
 		return sc.MinMaxConfig
 	}
 
@@ -61,12 +61,12 @@ func (sc Config) ApplicableLimits(l *log.Entry) MinMaxConfig {
 
 	for _, hc := range sc.HourlyConfig {
 		if isHourWithinBoundaries(hours, hc.StartHour, hc.EndHour) {
-			l.Debug(fmt.Sprintf("Applying `%v` hourly config", hc.Name))
+			zap.S().Debug(fmt.Sprintf("Applying `%v` hourly config", hc.Name))
 			return hc.MinMaxConfig
 		}
 	}
 
-	l.Debug("None hourly config is applicable, fallback to default")
+	zap.S().Debug("none hourly config is applicable, fallback to default")
 	return sc.MinMaxConfig
 }
 

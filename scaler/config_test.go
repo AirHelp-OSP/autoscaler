@@ -3,8 +3,6 @@ package scaler
 import (
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -20,11 +18,9 @@ var _ = Describe("Config", func() {
 
 		DescribeTable("Properly identifies applicable limits",
 			func(i applicableLimitsTestInput) {
-				logger := log.WithField("test", true)
-
 				now = func() time.Time { return i.now }
 
-				res := i.config.ApplicableLimits(logger)
+				res := i.config.ApplicableLimits()
 
 				Expect(res.MinimumNumberOfPods).To(Equal(i.expectedMinimumNumberOfPods))
 				Expect(res.MaximumNumberOfPods).To(Equal(i.expectedMaximumNumberOfPods))
