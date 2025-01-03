@@ -4,20 +4,22 @@ import (
 	"context"
 	"errors"
 
-	awsMock "github.com/AirHelp/autoscaler/probe/sqs/aws_mocks"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/golang/mock/gomock"
+	"github.com/AirHelp/autoscaler/probe/sqs/mocks"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("Probe", func() {
 	Describe("New()", func() {
 		var config Config
+		var ctx = context.Background()
+		var SQSService *SQSService
 
 		It("Returns error when no queue provided", func() {
-			probe, err := New(&config)
+			probe, err := New(ctx, &config, SQSService)
 
 			Expect(probe).To(Equal(&Probe{}))
 			Expect(err).To(Equal(ErrNoQueueSpecified))
@@ -27,7 +29,7 @@ var _ = Describe("Probe", func() {
 	Describe("Probe receiver", func() {
 		var (
 			mockCtrl *gomock.Controller
-			mockSqs  *awsMock.MockSQSAPI
+			mockSqs  *sqsMock.MockSqsClient
 
 			queueURLs = []string{"q1", "q2", "q3"}
 			probe     Probe
@@ -37,7 +39,7 @@ var _ = Describe("Probe", func() {
 
 		BeforeEach(func() {
 			mockCtrl = gomock.NewController(GinkgoT())
-			mockSqs = awsMock.NewMockSQSAPI(mockCtrl)
+			mockSqs = sqsMock.NewMockSqsClient(mockCtrl)
 
 			probe = Probe{
 				queueURLs: queueURLs,
@@ -61,36 +63,36 @@ var _ = Describe("Probe", func() {
 				noOfMessagesNotVisible := []string{"10", "0", "0"}
 
 				q1Result := sqs.GetQueueAttributesOutput{
-					Attributes: map[string]*string{
-						"ApproximateNumberOfMessages":           &noOfMessages[0],
-						"ApproximateNumberOfMessagesNotVisible": &noOfMessagesNotVisible[0],
+					Attributes: map[string]string{
+						"ApproximateNumberOfMessages":           noOfMessages[0],
+						"ApproximateNumberOfMessagesNotVisible": noOfMessagesNotVisible[0],
 					},
 				}
 				q2Result := sqs.GetQueueAttributesOutput{
-					Attributes: map[string]*string{
-						"ApproximateNumberOfMessages":           &noOfMessages[1],
-						"ApproximateNumberOfMessagesNotVisible": &noOfMessagesNotVisible[1],
+					Attributes: map[string]string{
+						"ApproximateNumberOfMessages":           noOfMessages[1],
+						"ApproximateNumberOfMessagesNotVisible": noOfMessagesNotVisible[1],
 					},
 				}
 				q3Result := sqs.GetQueueAttributesOutput{
-					Attributes: map[string]*string{
-						"ApproximateNumberOfMessages":           &noOfMessages[2],
-						"ApproximateNumberOfMessagesNotVisible": &noOfMessagesNotVisible[2],
+					Attributes: map[string]string{
+						"ApproximateNumberOfMessages":           noOfMessages[2],
+						"ApproximateNumberOfMessagesNotVisible": noOfMessagesNotVisible[2],
 					},
 				}
 
-				mockSqs.EXPECT().GetQueueAttributesWithContext(ctx, &sqs.GetQueueAttributesInput{
+				mockSqs.EXPECT().GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 					QueueUrl:       &queueURLs[0],
-					AttributeNames: []*string{aws.String("ApproximateNumberOfMessages"), aws.String("ApproximateNumberOfMessagesNotVisible")},
+					AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages, types.QueueAttributeNameApproximateNumberOfMessagesNotVisible},
 				}).Return(&q1Result, nil)
 
-				mockSqs.EXPECT().GetQueueAttributesWithContext(ctx, &sqs.GetQueueAttributesInput{
+				mockSqs.EXPECT().GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 					QueueUrl:       &queueURLs[1],
-					AttributeNames: []*string{aws.String("ApproximateNumberOfMessages"), aws.String("ApproximateNumberOfMessagesNotVisible")},
+					AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages, types.QueueAttributeNameApproximateNumberOfMessagesNotVisible},
 				}).Return(&q2Result, nil)
-				mockSqs.EXPECT().GetQueueAttributesWithContext(ctx, &sqs.GetQueueAttributesInput{
+				mockSqs.EXPECT().GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 					QueueUrl:       &queueURLs[2],
-					AttributeNames: []*string{aws.String("ApproximateNumberOfMessages"), aws.String("ApproximateNumberOfMessagesNotVisible")},
+					AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages, types.QueueAttributeNameApproximateNumberOfMessagesNotVisible},
 				}).Return(&q3Result, nil)
 
 				res, err := probe.Check(ctx)
@@ -100,9 +102,9 @@ var _ = Describe("Probe", func() {
 			})
 
 			It("When error happens it proxies error", func() {
-				mockSqs.EXPECT().GetQueueAttributesWithContext(ctx, &sqs.GetQueueAttributesInput{
+				mockSqs.EXPECT().GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 					QueueUrl:       &queueURLs[0],
-					AttributeNames: []*string{aws.String("ApproximateNumberOfMessages"), aws.String("ApproximateNumberOfMessagesNotVisible")},
+					AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages, types.QueueAttributeNameApproximateNumberOfMessagesNotVisible},
 				}).Return(&sqs.GetQueueAttributesOutput{}, errors.New("access denied"))
 
 				res, err := probe.Check(ctx)

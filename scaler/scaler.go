@@ -35,6 +35,7 @@ type Scaler struct {
 	lastActionAt   time.Time
 
 	k8sService K8SClient
+	sqsService *sqs.SQSService
 	notifiers  []notification.Notifier
 
 	globalConfig config.Config
@@ -47,6 +48,7 @@ type NewScalerInput struct {
 	RawYamlConfig  string
 
 	K8sService K8SClient
+	SQSService *sqs.SQSService
 	Notifiers  []notification.Notifier
 
 	GlobalConfig config.Config
@@ -68,6 +70,7 @@ func New(i NewScalerInput) (*Scaler, error) {
 		notifiers:      i.Notifiers,
 		k8sService:     i.K8sService,
 		globalConfig:   i.GlobalConfig,
+		sqsService:     i.SQSService,
 	}
 	scalerLogger := zap.S().With("deployment", i.DeploymentName)
 
@@ -80,12 +83,13 @@ func New(i NewScalerInput) (*Scaler, error) {
 	s.deployment = deployment
 	scalerLogger.Debug("finished prefetch of deployment")
 
-	scalerConfig := NewScalerConfigWithDefaults()
-	if err := yaml.Unmarshal([]byte(i.RawYamlConfig), &scalerConfig); err != nil {
+	scalerConfig, err := ParseRawScalerConfig(i.RawYamlConfig)
+	if err != nil {
 		scalerLogger.With("error", err).Warn("failed to parse config")
 		scalerLogger.With("error", err).Debugf("raw config: %+v", i.RawYamlConfig)
 		return &s, err
 	}
+
 	s.scalerConfig = scalerConfig
 	scalerLogger.Debugf("parsed autoscaler config: %+v", scalerConfig)
 
@@ -94,7 +98,7 @@ func New(i NewScalerInput) (*Scaler, error) {
 
 	switch {
 	case s.scalerConfig.Sqs != nil:
-		requestedProbe, err = sqs.New(s.scalerConfig.Sqs)
+		requestedProbe, err = sqs.New(i.Ctx, s.scalerConfig.Sqs, s.sqsService)
 	case s.scalerConfig.Redis != nil:
 		requestedProbe, err = redis.New(s.scalerConfig.Redis)
 	case s.scalerConfig.Nginx != nil:
@@ -269,4 +273,10 @@ func (s *Scaler) isDeploymentNotAtTargetReplicas() bool {
 
 func (s *Scaler) isAutoscalerInCooldown(currentTime time.Time) bool {
 	return !s.lastActionAt.IsZero() && s.deployment.Status.Replicas != int32(0) && s.lastActionAt.After(currentTime.Add(-s.scalerConfig.CooldownPeriod))
+}
+
+func ParseRawScalerConfig(rawConfig string) (Config, error) {
+	scalerConfig := NewScalerConfigWithDefaults()
+	err := yaml.Unmarshal([]byte(rawConfig), &scalerConfig)
+	return scalerConfig, err
 }

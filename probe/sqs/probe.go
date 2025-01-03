@@ -5,13 +5,16 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	awsCfg "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-//go:generate mockgen -destination=aws_mocks/sqs_iface_mock.go -package awsMock github.com/aws/aws-sdk-go/service/sqs/sqsiface SQSAPI
+//go:generate mockgen -destination=mocks/sqsClientInterface.go -package sqsMock github.com/AirHelp/autoscaler/probe/sqs SqsClient
+type SQSClient interface {
+	GetQueueUrl(context.Context, *sqs.GetQueueUrlInput, ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
+	GetQueueAttributes(context.Context, *sqs.GetQueueAttributesInput, ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error)
+}
 
 type Config struct {
 	Queues []string `yaml:"queues"`
@@ -19,41 +22,44 @@ type Config struct {
 
 type Probe struct {
 	queueURLs []string
-	client    sqsiface.SQSAPI
+	client    SQSClient
+}
+
+type SQSService struct {
+	Client SQSClient
 }
 
 var ErrNoQueueSpecified = errors.New("no queues provided")
 
-func New(config *Config) (*Probe, error) {
-	sess, err := session.NewSession()
+func NewSQSService(ctx context.Context) (*SQSService, error) {
+	cfg, err := awsCfg.LoadDefaultConfig(ctx)
 	if err != nil {
-		return &Probe{}, err
+		return &SQSService{}, err
 	}
 
-	svc := sqs.New(sess)
+	return &SQSService{
+		Client: sqs.NewFromConfig(cfg),
+	}, nil
+}
 
+func New(ctx context.Context, config *Config, s *SQSService) (*Probe, error) {
 	var queueURLs []string
-
-	queueURLInput := &sqs.GetQueueUrlInput{}
-
 	if len(config.Queues) == 0 {
 		return &Probe{}, ErrNoQueueSpecified
 	}
-
+	queueURLInput := &sqs.GetQueueUrlInput{}
 	for _, queue := range config.Queues {
-		queueURLInput.SetQueueName(queue)
-		res, err := svc.GetQueueUrl(queueURLInput)
-
+		queueURLInput.QueueName = &queue
+		res, err := s.Client.GetQueueUrl(ctx, queueURLInput)
 		if err != nil {
 			return &Probe{}, err
 		}
 
 		queueURLs = append(queueURLs, *res.QueueUrl)
 	}
-
 	return &Probe{
 		queueURLs: queueURLs,
-		client:    svc,
+		client:    s.Client,
 	}, nil
 }
 
@@ -65,9 +71,9 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 	var acc int
 
 	for _, queueURL := range p.queueURLs {
-		output, err := p.client.GetQueueAttributesWithContext(ctx, &sqs.GetQueueAttributesInput{
+		output, err := p.client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 			QueueUrl:       &queueURL,
-			AttributeNames: []*string{aws.String("ApproximateNumberOfMessages"), aws.String("ApproximateNumberOfMessagesNotVisible")},
+			AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages, types.QueueAttributeNameApproximateNumberOfMessagesNotVisible},
 		})
 
 		if err != nil {
@@ -75,7 +81,7 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 		}
 
 		for _, num := range output.Attributes {
-			size, err := strconv.Atoi(*num)
+			size, err := strconv.Atoi(num)
 
 			if err != nil {
 				return 0, err
