@@ -61,7 +61,7 @@ func (sc Config) ApplicableLimits() MinMaxConfig {
 
 	for _, hc := range sc.HourlyConfig {
 		if isHourWithinBoundaries(hours, hc.StartHour, hc.EndHour) {
-			zap.S().Debug(fmt.Sprintf("Applying `%v` hourly config", hc.Name))
+			zap.S().Debug(fmt.Sprintf("applying `%v` hourly config", hc.Name))
 			return hc.MinMaxConfig
 		}
 	}

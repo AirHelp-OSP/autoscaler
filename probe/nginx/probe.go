@@ -116,7 +116,7 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 	pods, err := p.k8sService.GetPodsFromDeployment(ctx, p.deployment, additionalExpectedWebPodLabels)
 
 	if err != nil {
-		zap.S().Warnf("failed to get pods for deployment: %v", err)
+		zap.S().With("error", err).Warn("failed to get pods for deployment")
 		return 0, err
 	}
 
@@ -152,7 +152,7 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 		result, err := p.fetchActiveConnectionsFromPods(pods)
 
 		if err != nil {
-			zap.S().Warnf("failed to fetch active connections: %v", err)
+			zap.S().With("error", err).Warn("failed to fetch active connections")
 			return 0, err
 		}
 

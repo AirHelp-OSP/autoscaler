@@ -36,7 +36,7 @@ func (c *NginxClient) GetActiveConnections(ctx context.Context, ip string) (int,
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			zap.S().Error("failed to close response body")
+			zap.S().With("error", err).Error("failed to close response body")
 		}
 	}()
 

@@ -59,14 +59,14 @@ func main() {
 	zap.S().Debug("initializing k8s client and config")
 	k8sSvc, err := k8s.New(cfg.Namespace)
 	if err != nil {
-		zap.S().Errorf("failed to initialize K8s client: %v", err)
+		zap.S().With("error", err).Error("failed to initialize K8s client")
 		panic(err)
 	}
 	zap.S().Debug("successfully initialized k8s client and config")
 
 	configMap, err := k8sSvc.GetConfigMap(ctx, configMapName)
 	if err != nil {
-		zap.S().Errorf("failed to get autoscaler configmap: %v", err)
+		zap.S().With("error", err).Error("failed to get autoscaler configmap")
 		panic(err)
 	}
 
@@ -95,7 +95,7 @@ func main() {
 		})
 
 		if err != nil {
-			zap.S().Errorf("failed to initialize autoscaler for %v: %v, skipping", deployment, err)
+			zap.S().With("error", err).Errorf("failed to initialize autoscaler for %v: , skipping", deployment)
 			continue
 		}
 

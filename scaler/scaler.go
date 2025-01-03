@@ -73,7 +73,7 @@ func New(i NewScalerInput) (*Scaler, error) {
 	zap.S().With("deployment", i.DeploymentName).Debug("starting prefetch of deployment")
 	deployment, err := s.k8sService.GetDeployment(i.Ctx, s.deploymentName)
 	if err != nil {
-		zap.S().With("deployment", i.DeploymentName).Errorf("failed to fetch deployment: %v", err)
+		zap.S().With("deployment", i.DeploymentName, "error", err).Errorf("failed to fetch deployment")
 		return &s, err
 	}
 	s.deployment = deployment
@@ -81,8 +81,8 @@ func New(i NewScalerInput) (*Scaler, error) {
 
 	scalerConfig := NewScalerConfigWithDefaults()
 	if err := yaml.Unmarshal([]byte(i.RawYamlConfig), &scalerConfig); err != nil {
-		zap.S().With("deployment", i.DeploymentName).Debugf("failed to parse config: %v", err)
-		zap.S().With("deployment", i.DeploymentName).Debugf("raw config: %+v", i.RawYamlConfig)
+		zap.S().With("deployment", i.DeploymentName, "error", err).Warn("failed to parse config")
+		zap.S().With("deployment", i.DeploymentName, "error", err).Debugf("raw config: %+v", i.RawYamlConfig)
 		return &s, err
 	}
 	s.scalerConfig = scalerConfig
@@ -138,7 +138,7 @@ func (s *Scaler) perform(ctx context.Context) {
 
 	probeResult, err := s.probe.Check(ctx)
 	if err != nil {
-		zap.S().With("deployment", s.deploymentName).Warnf("skipping autoscaling, probe failed: %v", err)
+		zap.S().With("deployment", s.deploymentName, "error", err).Warnf("skipping autoscaling, probe failed: %v", err)
 		return
 	}
 
@@ -148,7 +148,7 @@ func (s *Scaler) perform(ctx context.Context) {
 	zap.S().With("deployment", s.deploymentName).Debugf("last 10 probe runs %+v", s.lastTenResults)
 
 	if err = s.refreshDeployment(ctx); err != nil {
-		zap.S().With("deployment", s.deploymentName).Warnf("failed to refresh deployment: %v", err)
+		zap.S().With("deployment", s.deploymentName, "error", err).Warnf("failed to refresh deployment: %v", err)
 		return
 	}
 
@@ -163,13 +163,13 @@ func (s *Scaler) perform(ctx context.Context) {
 	}
 
 	decision := s.calculateDecision(probeResult)
-	zap.S().With("deployment", s.deploymentName).Debugf("decision: %s", decision.toText())
+	zap.S().With("deployment", s.deploymentName).Infof("decision: %s", decision.toText())
 
 	if decision.value != remain {
 		_, err = s.k8sService.ScaleDeployment(ctx, s.deployment, decision.target)
 
 		if err != nil {
-			zap.S().With("deployment", s.deploymentName).Errorf("failed to scale deployment: %v", err)
+			zap.S().With("deployment", s.deploymentName, "error", err).Warn("updating replication failed")
 		}
 
 		s.lastActionAt = currentTime
@@ -187,7 +187,7 @@ func (s *Scaler) perform(ctx context.Context) {
 
 			for _, notifier := range s.notifiers {
 				if err := notifier.Notify(ctx, notificationPayload); err != nil {
-					zap.S().With("deployment", s.deploymentName).Errorf("failed to notify %v: %v", notifier.Kind(), err)
+					zap.S().With("deployment", s.deploymentName, "error", err).Warnf("failed to notify %v", notifier.Kind())
 				}
 			}
 		}
