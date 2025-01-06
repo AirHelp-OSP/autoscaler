@@ -85,7 +85,7 @@ func main() {
 	for deployment, rawYamlConfig := range configMap.Data {
 		var scalerInstance ScalerEntity
 
-		scalerInstance, err := scaler.New(scaler.NewScalerInput{
+		scalerInstance, err := scaler.New(ctx, scaler.NewScalerInput{
 			Ctx:            ctx,
 			DeploymentName: deployment,
 			RawYamlConfig:  rawYamlConfig,

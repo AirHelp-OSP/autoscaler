@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	//"github.com/AirHelp/autoscaler/probe/sqs/mocks"
+	//"github.com/aws/aws-sdk-go-v2/aws"
+	//"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,6 +22,8 @@ import (
 	scalerMock "github.com/AirHelp/autoscaler/scaler/mock"
 	"github.com/AirHelp/autoscaler/testdata"
 	"github.com/alicebob/miniredis/v2"
+
+	//uberGomock "go.uber.org/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -64,8 +69,6 @@ var _ = Describe("Scaler", func() {
 		)
 
 		BeforeEach(func() {
-			gock.DisableNetworking()
-
 			rawYamlConfig = testdata.LoadFixture("autoscaler-config.yaml")
 
 			// Mock QueueName -> QueueUrl translation
@@ -77,7 +80,7 @@ var _ = Describe("Scaler", func() {
 				BodyString(sqsGetQueueResponse)
 			// Mock authorization requests
 			gock.New("https://sqs.eu-west-1.amazonaws.com").Post("/").Reply(200)
-
+			gock.DisableNetworking()
 			r := int32(9)
 			deployment = appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
@@ -107,9 +110,25 @@ var _ = Describe("Scaler", func() {
 		})
 
 		It("When all good it properly build scaler instance", func() {
-			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
+			// var (
+			// 	mockCtrl *uberGomock.Controller
+			// 	mockSqs  *sqsMock.MockSqsClient
 
-			sc, err := New(input)
+			// 	//queueURLs = []string{"q1", "q2", "q3"}
+			// )
+			// mockCtrl = uberGomock.NewController(GinkgoT())
+			// mockSqs = sqsMock.NewMockSqsClient(mockCtrl)
+
+			// queInput := &sqs.GetQueueUrlInput{
+			// 	QueueName: aws.String("q1"),
+			// }
+			// queOutput := &sqs.GetQueueUrlOutput{
+			// 	QueueUrl: aws.String("https://sqs.eu-west-1.amazonaws.com/123456789012/q1"),
+			// }
+			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
+			//mockSqs.EXPECT().GetQueueUrl(ctx, queInput).Return(queOutput, nil)
+
+			sc, err := New(ctx, input)
 
 			Expect(err).ToNot(HaveOccurred())
 
@@ -119,6 +138,7 @@ var _ = Describe("Scaler", func() {
 			Expect(sc.notifiers[0]).To(Equal(notifierMock))
 			Expect(sc.k8sService).To(Equal(k8sServiceMock))
 			Expect(sc.globalConfig).To(Equal(globalConfig))
+			//mockCtrl.Finish()
 		})
 
 		It("When Redis probe requested it properly creates Redis based scaler", func() {
@@ -130,7 +150,7 @@ var _ = Describe("Scaler", func() {
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 			input.RawYamlConfig = strings.Replace(testdata.LoadFixture("autoscaler-config-redis.yaml"), "localhost:6379", server.Addr(), 1)
 
-			sc, err := New(input)
+			sc, err := New(context.Background(), input)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sc.deploymentName).To(Equal(deploymentName))
@@ -145,7 +165,7 @@ var _ = Describe("Scaler", func() {
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 			input.RawYamlConfig = testdata.LoadFixture("autoscaler-config-nginx.yaml")
 
-			sc, err := New(input)
+			sc, err := New(context.Background(), input)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sc.deploymentName).To(Equal(deploymentName))
@@ -159,7 +179,7 @@ var _ = Describe("Scaler", func() {
 		It("When fetching deployment fails it returns error", func() {
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&appsv1.Deployment{}, errors.New("Failed to fetch deployment \"test-deployment\""))
 
-			res, err := New(input)
+			res, err := New(context.Background(), input)
 
 			Expect(res).ToNot(BeNil())
 			Expect(err).To(HaveOccurred())
@@ -178,7 +198,7 @@ var _ = Describe("Scaler", func() {
 
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 
-			res, err := New(input)
+			res, err := New(context.Background(), input)
 
 			Expect(res).ToNot(BeNil())
 			Expect(err).To(HaveOccurred())
@@ -191,7 +211,7 @@ var _ = Describe("Scaler", func() {
 
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 
-			res, err := New(input)
+			res, err := New(context.Background(), input)
 
 			Expect(res).ToNot(BeNil())
 			Expect(err).To(HaveOccurred())

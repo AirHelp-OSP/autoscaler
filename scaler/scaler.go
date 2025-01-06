@@ -62,7 +62,7 @@ type K8SClient interface {
 
 var ErrProbeNotSpecified = errors.New("no probe specified for autoscaler")
 
-func New(i NewScalerInput) (*Scaler, error) {
+func New(ctx context.Context, i NewScalerInput) (*Scaler, error) {
 	s := Scaler{
 		deploymentName: i.DeploymentName,
 		notifiers:      i.Notifiers,
@@ -93,7 +93,7 @@ func New(i NewScalerInput) (*Scaler, error) {
 
 	switch {
 	case s.scalerConfig.Sqs != nil:
-		requestedProbe, err = sqs.New(s.scalerConfig.Sqs)
+		requestedProbe, err = sqs.New(ctx, s.scalerConfig.Sqs)
 	case s.scalerConfig.Redis != nil:
 		requestedProbe, err = redis.New(s.scalerConfig.Redis)
 	case s.scalerConfig.Nginx != nil:
