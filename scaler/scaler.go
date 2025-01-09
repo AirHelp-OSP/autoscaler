@@ -61,7 +61,6 @@ type K8SClient interface {
 }
 
 var ErrProbeNotSpecified = errors.New("no probe specified for autoscaler")
-var scallerLogger *zap.SugaredLogger
 
 func New(i NewScalerInput) (*Scaler, error) {
 	s := Scaler{
@@ -70,28 +69,28 @@ func New(i NewScalerInput) (*Scaler, error) {
 		k8sService:     i.K8sService,
 		globalConfig:   i.GlobalConfig,
 	}
-	scallerLogger = zap.S().With("deployment", i.DeploymentName)
+	scalerLogger := zap.S().With("deployment", i.DeploymentName)
 
-	scallerLogger.Debug("starting prefetch of deployment")
+	scalerLogger.Debug("starting prefetch of deployment")
 	deployment, err := s.k8sService.GetDeployment(i.Ctx, s.deploymentName)
 	if err != nil {
-		scallerLogger.With("error", err).Errorf("failed to fetch deployment")
+		scalerLogger.With("error", err).Errorf("failed to fetch deployment")
 		return &s, err
 	}
 	s.deployment = deployment
-	scallerLogger.Debug("finished prefetch of deployment")
+	scalerLogger.Debug("finished prefetch of deployment")
 
 	scalerConfig := NewScalerConfigWithDefaults()
 	if err := yaml.Unmarshal([]byte(i.RawYamlConfig), &scalerConfig); err != nil {
-		scallerLogger.With("error", err).Warn("failed to parse config")
-		scallerLogger.With("error", err).Debugf("raw config: %+v", i.RawYamlConfig)
+		scalerLogger.With("error", err).Warn("failed to parse config")
+		scalerLogger.With("error", err).Debugf("raw config: %+v", i.RawYamlConfig)
 		return &s, err
 	}
 	s.scalerConfig = scalerConfig
-	scallerLogger.Debugf("parsed autoscaler config: %+v", scalerConfig)
+	scalerLogger.Debugf("parsed autoscaler config: %+v", scalerConfig)
 
 	var requestedProbe probe.Probe
-	scallerLogger.Debug("initializing probe")
+	scalerLogger.Debug("initializing probe")
 
 	switch {
 	case s.scalerConfig.Sqs != nil:
@@ -109,24 +108,24 @@ func New(i NewScalerInput) (*Scaler, error) {
 	}
 
 	s.probe = requestedProbe
-	scallerLogger.Debugf("initialized probe: %s", s.probe.Kind())
+	scalerLogger.Debugf("initialized probe: %s", s.probe.Kind())
 
 	return &s, nil
 }
 
 func (s *Scaler) Start(ctx context.Context) {
-	scallerLogger = zap.S().With("deployment", s.deploymentName)
+	scalerLogger := zap.S().With("deployment", s.deploymentName)
 	ticker := time.NewTicker(s.scalerConfig.CheckInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
-			scallerLogger.Debug("shutting down scaler")
+			scalerLogger.Debug("shutting down scaler")
 
 			return
 		case <-ticker.C:
-			scallerLogger.Debug("interval tick")
+			scalerLogger.Debug("interval tick")
 			timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			s.perform(timeoutCtx)
 			cancel()
@@ -135,45 +134,45 @@ func (s *Scaler) Start(ctx context.Context) {
 }
 
 func (s *Scaler) perform(ctx context.Context) {
-	scallerLogger = zap.S().With("deployment", s.deploymentName)
-	scallerLogger.Debug("starting to evaluate autoscaling needs")
+	scalerLogger := zap.S().With("deployment", s.deploymentName)
+	scalerLogger.Debug("starting to evaluate autoscaling needs")
 
 	currentTime := time.Now()
 
 	probeResult, err := s.probe.Check(ctx)
 	if err != nil {
-		scallerLogger.With("error", err).Warnf("skipping autoscaling, probe failed: %v", err)
+		scalerLogger.With("error", err).Warnf("skipping autoscaling, probe failed: %v", err)
 		return
 	}
 
-	scallerLogger.Debugf("probe %s returned %d", s.probe.Kind(), probeResult)
+	scalerLogger.Debugf("probe %s returned %d", s.probe.Kind(), probeResult)
 	s.lastTenResults = append(s.lastTenResults, probeResult)
 	s.lastTenResults = helper.Last(s.lastTenResults, resultsToStore)
-	scallerLogger.Debugf("last 10 probe runs %+v", s.lastTenResults)
+	scalerLogger.Debugf("last 10 probe runs %+v", s.lastTenResults)
 
 	if err = s.refreshDeployment(ctx); err != nil {
-		scallerLogger.With("error", err).Warnf("failed to refresh deployment: %v", err)
+		scalerLogger.With("error", err).Warnf("failed to refresh deployment: %v", err)
 		return
 	}
 
 	if s.isDeploymentNotAtTargetReplicas() {
-		scallerLogger.Warn("deployment available replicas not at target. won't adjust")
+		scalerLogger.Warn("deployment available replicas not at target. won't adjust")
 		return
 	}
 
 	if s.isAutoscalerInCooldown(currentTime) {
-		scallerLogger.Debug("autoscaler in cooldown, not making decision")
+		scalerLogger.Debug("autoscaler in cooldown, not making decision")
 		return
 	}
 
 	decision := s.calculateDecision(probeResult)
-	scallerLogger.Infof("decision: %s", decision.toText())
+	scalerLogger.Infof("decision: %s", decision.toText())
 
 	if decision.value != remain {
 		_, err = s.k8sService.ScaleDeployment(ctx, s.deployment, decision.target)
 
 		if err != nil {
-			scallerLogger.With("error", err).Warn("updating replication failed")
+			scalerLogger.With("error", err).Warn("updating replication failed")
 		}
 
 		s.lastActionAt = currentTime
@@ -191,17 +190,17 @@ func (s *Scaler) perform(ctx context.Context) {
 
 			for _, notifier := range s.notifiers {
 				if err := notifier.Notify(ctx, notificationPayload); err != nil {
-					scallerLogger.With("error", err).Warnf("failed to notify %v", notifier.Kind())
+					scalerLogger.With("error", err).Warnf("failed to notify %v", notifier.Kind())
 				}
 			}
 		}
 	}
 
-	scallerLogger.Debug("finished evaluating autoscaling needs")
+	scalerLogger.Debug("finished evaluating autoscaling needs")
 }
 
 func (s *Scaler) calculateDecision(probeResult int) decision {
-	scallerLogger = zap.S().With("deployment", s.deploymentName)
+	scalerLogger := zap.S().With("deployment", s.deploymentName)
 	currentReplicasCount := int(*s.deployment.Spec.Replicas)
 
 	d := decision{
@@ -212,40 +211,40 @@ func (s *Scaler) calculateDecision(probeResult int) decision {
 
 	desiredReplicasCount := int(math.Ceil(float64(probeResult) / float64(s.scalerConfig.Threshold)))
 
-	scallerLogger.Debugf("current replicas count: %d, desired replicas count: %d", probeResult, desiredReplicasCount)
+	scalerLogger.Debugf("current replicas count: %d, desired replicas count: %d", probeResult, desiredReplicasCount)
 
 	minMaxConfig := s.scalerConfig.ApplicableLimits()
 
 	if currentReplicasCount == desiredReplicasCount {
-		scallerLogger.Debug("current replicas same as desired, deployment remain the same")
+		scalerLogger.Debug("current replicas same as desired, deployment remain the same")
 	} else if currentReplicasCount < desiredReplicasCount {
-		scallerLogger.Debug("current replicas lower than desired")
+		scalerLogger.Debug("current replicas lower than desired")
 		if currentReplicasCount+1 <= minMaxConfig.MaximumNumberOfPods {
-			scallerLogger.Debug("scale up available, decided to scale up")
+			scalerLogger.Debug("scale up available, decided to scale up")
 			d.value = scaleUp
 			d.target = currentReplicasCount + 1
 		} else {
-			scallerLogger.Debug("scale up unavailable, reached maximum number of pods")
+			scalerLogger.Debug("scale up unavailable, reached maximum number of pods")
 		}
 	} else if currentReplicasCount > desiredReplicasCount {
-		scallerLogger.Debug("current replicas higher than desired")
+		scalerLogger.Debug("current replicas higher than desired")
 		if currentReplicasCount-1 >= minMaxConfig.MinimumNumberOfPods {
 			if currentReplicasCount-1 == 0 {
 				// Check if last `consecutiveZerosToZeroDeployment` are zero read outs
 				if helper.OnlyZeros(helper.Last(s.lastTenResults, consecutiveZerosToZeroDeployment)) {
-					scallerLogger.Debug("scalling down to zero, consecutive zero reads")
+					scalerLogger.Debug("scalling down to zero, consecutive zero reads")
 					d.value = scaleDown
 					d.target = currentReplicasCount - 1
 				} else {
-					scallerLogger.Debug("scaling down to zero unavailable, no consecutive zero reads")
+					scalerLogger.Debug("scaling down to zero unavailable, no consecutive zero reads")
 				}
 			} else {
-				scallerLogger.Debug("scale down available, decided to scale down")
+				scalerLogger.Debug("scale down available, decided to scale down")
 				d.value = scaleDown
 				d.target = currentReplicasCount - 1
 			}
 		} else {
-			scallerLogger.Debug("scale down unavailable, reached minimum number of pods")
+			scalerLogger.Debug("scale down unavailable, reached minimum number of pods")
 		}
 	}
 
@@ -253,14 +252,14 @@ func (s *Scaler) calculateDecision(probeResult int) decision {
 }
 
 func (s *Scaler) refreshDeployment(ctx context.Context) error {
-	scallerLogger = zap.S().With("deployment", s.deploymentName)
-	scallerLogger.Debug("starting refreshing of deployment")
+	scalerLogger := zap.S().With("deployment", s.deploymentName)
+	scalerLogger.Debug("starting refreshing of deployment")
 	deployment, err := s.k8sService.GetDeployment(ctx, s.deploymentName)
 	if err != nil {
 		return err
 	}
 	s.deployment = deployment
-	scallerLogger.Debug("finished refreshing of deployment")
+	scalerLogger.Debug("finished refreshing of deployment")
 	return nil
 }
 
