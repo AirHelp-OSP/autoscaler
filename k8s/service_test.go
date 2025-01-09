@@ -5,7 +5,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +13,6 @@ import (
 
 var _ = Describe("Service with fake client", func() {
 	var (
-		log       *log.Entry
 		namespace string
 
 		client      *fake.Clientset
@@ -68,7 +66,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetDeployments(ctx)
@@ -99,7 +96,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetDeployment(ctx, "some-deployment")
@@ -112,7 +108,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    emptyClient,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetDeployment(ctx, "some-deployment")
@@ -204,7 +199,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetPodsFromDeployment(ctx, deployment, map[string]string{})
@@ -232,7 +226,6 @@ var _ = Describe("Service with fake client", func() {
 				svc := Service{
 					Client:    client,
 					Namespace: namespace,
-					logger:    log,
 				}
 
 				res, err := svc.GetPodsFromDeployment(ctx, deployment, additionalLabels)
@@ -262,7 +255,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetConfigMap(ctx, "some-config-map")
@@ -275,7 +267,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    emptyClient,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.GetConfigMap(ctx, "some-config-map")
@@ -305,7 +296,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.ScaleDeployment(ctx, deployment, 3)
@@ -323,7 +313,6 @@ var _ = Describe("Service with fake client", func() {
 			svc := Service{
 				Client:    client,
 				Namespace: namespace,
-				logger:    log,
 			}
 
 			res, err := svc.ScaleDeployment(ctx, deployment, 1)

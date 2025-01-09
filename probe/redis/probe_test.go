@@ -8,19 +8,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/alicebob/miniredis/v2"
 )
 
 var _ = Describe("Probe", func() {
 	Describe("New", func() {
 		var config Config
-		var logger *log.Entry
-
-		BeforeEach(func() {
-			logger = log.WithField("test", true)
-		})
 
 		AfterEach(func() {
 			config = Config{}
@@ -30,7 +23,7 @@ var _ = Describe("Probe", func() {
 			It("Returns error", func() {
 				config.ListKeys = []string{"asdf", "qwerty"}
 
-				probe, err := New(&config, logger)
+				probe, err := New(&config)
 
 				Expect(*probe).To(BeZero())
 				Expect(err).To(HaveOccurred())
@@ -42,7 +35,7 @@ var _ = Describe("Probe", func() {
 			It("Returns error", func() {
 				config.Hosts = []string{"host:6379"}
 
-				probe, err := New(&config, logger)
+				probe, err := New(&config)
 
 				Expect(*probe).To(BeZero())
 				Expect(err).To(HaveOccurred())
@@ -55,7 +48,7 @@ var _ = Describe("Probe", func() {
 				config.Hosts = []string{"host:6379"}
 				config.ListKeys = []string{"asdf"}
 
-				probe, err := New(&config, logger)
+				probe, err := New(&config)
 
 				Expect(*probe).To(BeZero())
 				Expect(err).To(HaveOccurred())
@@ -86,7 +79,7 @@ var _ = Describe("Probe", func() {
 
 			It("Properly setup redis probe", func() {
 
-				probe, err := New(&config, logger)
+				probe, err := New(&config)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(probe.listKeys).To(Equal(config.ListKeys))
@@ -100,8 +93,6 @@ var _ = Describe("Probe", func() {
 
 	Describe("Probe receiver", func() {
 		var (
-			log *log.Entry
-
 			ctx context.Context
 
 			listKeys = []string{"k1", "k2", "k3"}
@@ -130,7 +121,6 @@ var _ = Describe("Probe", func() {
 			probe = Probe{
 				listKeys: listKeys,
 				client:   ringClient,
-				logger:   log,
 			}
 		})
 

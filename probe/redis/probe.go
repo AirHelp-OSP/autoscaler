@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-redis/redis/v8"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -16,10 +16,9 @@ type Config struct {
 type Probe struct {
 	client   *redis.Ring
 	listKeys []string
-	logger   *log.Entry
 }
 
-func New(config *Config, logger *log.Entry) (*Probe, error) {
+func New(config *Config) (*Probe, error) {
 	if len(config.Hosts) == 0 {
 		return &Probe{}, fmt.Errorf("hosts list cannot be empty")
 	}
@@ -44,11 +43,12 @@ func New(config *Config, logger *log.Entry) (*Probe, error) {
 		err := res.Err()
 
 		if err != nil {
-			logger.Errorf("failed to connect to Redis instance: %v", shard.Options().Addr)
+			zap.S().Errorf("failed to connect to Redis instance: %v", shard.Options().Addr)
 			return err
 		}
 
-		logger.Debugf("successfully connected to Redis instance: %v, result: %v", shard.Options().Addr, res.Val())
+		zap.S().Debugf("successfully connected to Redis instance: %v, result: %v", shard.Options().Addr, res.Val())
+
 		return nil
 	})
 
@@ -59,7 +59,6 @@ func New(config *Config, logger *log.Entry) (*Probe, error) {
 	return &Probe{
 		client:   c,
 		listKeys: config.ListKeys,
-		logger:   logger,
 	}, nil
 }
 

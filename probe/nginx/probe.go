@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/zap"
 	"github.com/AirHelp/autoscaler/nginx_stats"
 	"github.com/AirHelp/autoscaler/stat"
-	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -40,8 +40,6 @@ type Probe struct {
 	consecutiveReads int
 	timeout          time.Duration
 	requestTimeout   time.Duration
-
-	logger *log.Entry
 }
 
 //go:generate mockgen -destination=mock/k8s_client_mock.go -package nginxMock github.com/AirHelp/autoscaler/probe/nginx K8SClient
@@ -54,7 +52,7 @@ type NginxClient interface {
 	GetActiveConnections(context.Context, string) (int, error)
 }
 
-func New(config *Config, k8sSvc K8SClient, deployment *appsv1.Deployment, logger *log.Entry) (*Probe, error) {
+func New(config *Config, k8sSvc K8SClient, deployment *appsv1.Deployment) (*Probe, error) {
 	endpoint := config.Endpoint
 
 	if endpoint == "" {
@@ -85,7 +83,7 @@ func New(config *Config, k8sSvc K8SClient, deployment *appsv1.Deployment, logger
 		requestTimeout = defaultRequestTimeout
 	}
 
-	nginxClient, err := nginx_stats.NewClient(endpoint, logger)
+	nginxClient, err := nginx_stats.NewClient(endpoint)
 
 	if err != nil {
 		return nil, err
@@ -101,8 +99,6 @@ func New(config *Config, k8sSvc K8SClient, deployment *appsv1.Deployment, logger
 		consecutiveReads: consecutiveReads,
 		timeout:          timeout,
 		requestTimeout:   requestTimeout,
-
-		logger: logger,
 	}, nil
 }
 
@@ -120,11 +116,11 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 	pods, err := p.k8sService.GetPodsFromDeployment(ctx, p.deployment, additionalExpectedWebPodLabels)
 
 	if err != nil {
-		p.logger.WithError(err).Warn("Failed getting pods for deployment")
+		zap.S().With("error", err).Warn("failed to get pods for deployment")
 		return 0, err
 	}
 
-	p.logger.Debugf("Found %d pods for deployment", len(pods.Items))
+	zap.S().Debugf("found %d pods for deployment", len(pods.Items))
 
 	allPodsReadyAndOperational := true
 	for _, pod := range pods.Items {
@@ -142,11 +138,11 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 	}
 
 	if !allPodsReadyAndOperational {
-		p.logger.Warn("At least one pod found not in ready state")
+		zap.S().Warn("at least one pod found not in ready state")
 		return 0, errors.New("deployment not fully operational")
 	}
 
-	p.logger.Debug("All pods ready and serving traffic")
+	zap.S().Debug("all pods ready and serving traffic")
 
 	var fullResults [][]int
 
@@ -156,7 +152,7 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 		result, err := p.fetchActiveConnectionsFromPods(pods)
 
 		if err != nil {
-			p.logger.WithError(err).Warnf("Failed to fetch active connections")
+			zap.S().With("error", err).Warn("failed to fetch active connections")
 			return 0, err
 		}
 
@@ -179,7 +175,7 @@ func (p *Probe) Check(ctx context.Context) (int, error) {
 		connections = append(connections, sum)
 	}
 
-	p.logger.Debugf("Connections slice gathered by probe: %+v", connections)
+	zap.S().Debugf("connections slice gathered by probe: %+v", connections)
 
 	switch p.statistic {
 	case "average":
@@ -210,7 +206,7 @@ func (p *Probe) fetchActiveConnectionsFromPods(pods *corev1.PodList) (map[string
 
 		activeConnections, err := p.nginxClient.GetActiveConnections(ctx, pod.Status.PodIP)
 
-		p.logger.WithField("pod", pod.ObjectMeta.Name).Debugf("Fetched active connections from pod: %+v", activeConnections)
+		zap.S().With("pod", pod.ObjectMeta.Name).Debugf("fetched active connections from pod: %+v", activeConnections)
 
 		statsChan <- nginxStatsResult{
 			pod:               pod,

@@ -10,20 +10,14 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = Describe("Probe", func() {
 	Describe("New()", func() {
-		var logger *log.Entry
 		var config Config
 
-		BeforeEach(func() {
-			logger = log.WithField("test", true)
-		})
-
 		It("Returns error when no queue provided", func() {
-			probe, err := New(&config, logger)
+			probe, err := New(&config)
 
 			Expect(probe).To(Equal(&Probe{}))
 			Expect(err).To(Equal(ErrNoQueueSpecified))
@@ -32,7 +26,6 @@ var _ = Describe("Probe", func() {
 
 	Describe("Probe receiver", func() {
 		var (
-			log      *log.Entry
 			mockCtrl *gomock.Controller
 			mockSqs  *awsMock.MockSQSAPI
 
@@ -49,7 +42,6 @@ var _ = Describe("Probe", func() {
 			probe = Probe{
 				queueURLs: queueURLs,
 				client:    mockSqs,
-				logger:    log,
 			}
 		})
 

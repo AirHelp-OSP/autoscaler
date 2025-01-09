@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -21,26 +19,20 @@ import (
 type Service struct {
 	Client    kubernetes.Interface
 	Namespace string
-	logger    *log.Entry
 }
 
-func New(namespace string, logger *log.Entry) (*Service, error) {
+func New(namespace string) (*Service, error) {
 	svc := &Service{
-		logger:    logger,
 		Namespace: namespace,
 	}
 
 	config, err := generateKubeConfig()
-
 	if err != nil {
-		logger.WithError(err).Warn("Failed to initialize K8S client")
 		return svc, err
 	}
 
 	c, err := kubernetes.NewForConfig(config)
-
 	if err != nil {
-		logger.WithError(err).Warn("Failed to initialize K8S client")
 		return svc, err
 	}
 

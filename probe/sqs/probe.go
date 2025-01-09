@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strconv"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -22,12 +20,11 @@ type Config struct {
 type Probe struct {
 	queueURLs []string
 	client    sqsiface.SQSAPI
-	logger    *log.Entry
 }
 
 var ErrNoQueueSpecified = errors.New("no queues provided")
 
-func New(config *Config, logger *log.Entry) (*Probe, error) {
+func New(config *Config) (*Probe, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return &Probe{}, err
@@ -57,7 +54,6 @@ func New(config *Config, logger *log.Entry) (*Probe, error) {
 	return &Probe{
 		queueURLs: queueURLs,
 		client:    svc,
-		logger:    logger,
 	}, nil
 }
 

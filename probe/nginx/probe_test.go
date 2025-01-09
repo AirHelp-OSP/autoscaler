@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,8 +16,6 @@ import (
 
 var _ = Describe("Probe", func() {
 	var (
-		logger *log.Entry
-
 		probe Probe
 
 		deployment *appsv1.Deployment
@@ -33,8 +30,6 @@ var _ = Describe("Probe", func() {
 	)
 
 	BeforeEach(func() {
-		logger = log.WithField("test", true)
-
 		ctx = context.Background()
 
 		mockCtrl = gomock.NewController(GinkgoT())
@@ -81,8 +76,6 @@ var _ = Describe("Probe", func() {
 			nginxClient: nginxClientMock,
 
 			deployment: deployment,
-
-			logger: logger,
 		}
 	})
 

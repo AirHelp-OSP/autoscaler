@@ -19,7 +19,6 @@ import (
 	scalerMock "github.com/AirHelp/autoscaler/scaler/mock"
 	"github.com/AirHelp/autoscaler/testdata"
 	"github.com/alicebob/miniredis/v2"
-	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,8 +29,6 @@ var _ = Describe("Scaler", func() {
 		notifierMock   *notificationMock.MockNotifier
 		k8sServiceMock *scalerMock.MockK8SClient
 
-		logger *log.Entry
-
 		ctx context.Context
 
 		deploymentName = "test-deployment"
@@ -39,8 +36,6 @@ var _ = Describe("Scaler", func() {
 	)
 
 	BeforeEach(func() {
-		logger = log.WithField("test", true)
-
 		ctx = context.Background()
 
 		_ = os.Setenv("AWS_REGION", "eu-west-1")
@@ -100,7 +95,6 @@ var _ = Describe("Scaler", func() {
 				Notifiers:      []notification.Notifier{notifierMock},
 				K8sService:     k8sServiceMock,
 				GlobalConfig:   globalConfig,
-				Logger:         logger,
 			}
 
 		})
@@ -250,7 +244,6 @@ var _ = Describe("Scaler", func() {
 					notifiers:      []notification.Notifier{notifierMock},
 					k8sService:     k8sServiceMock,
 					globalConfig:   globalConfig,
-					logger:         logger,
 					deployment:     &deployment,
 					probe:          probeInstanceMock,
 					scalerConfig:   scalerConfig,
@@ -402,7 +395,6 @@ var _ = Describe("Scaler", func() {
 					notifiers:      []notification.Notifier{notifierMock},
 					k8sService:     k8sServiceMock,
 					globalConfig:   globalConfig,
-					logger:         logger,
 					deployment:     &deployment,
 					probe:          probeInstanceMock,
 					scalerConfig:   scalerConfig,
@@ -575,7 +567,6 @@ var _ = Describe("Scaler", func() {
 					notifiers:      []notification.Notifier{notifierMock},
 					k8sService:     k8sServiceMock,
 					globalConfig:   globalConfig,
-					logger:         logger,
 					deployment:     &oldDeployment,
 					probe:          probeInstanceMock,
 				}
