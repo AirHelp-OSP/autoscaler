@@ -14,19 +14,13 @@ import (
 var _ = Describe("Service with fake client", func() {
 	var (
 		namespace string
-
-		client      *fake.Clientset
-		emptyClient *fake.Clientset
-
-		ctx context.Context
+		client    *fake.Clientset
+		ctx       context.Context
 	)
 
 	BeforeEach(func() {
 		namespace = "ugabuga"
-
 		ctx = context.TODO()
-
-		emptyClient = fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 	})
 
 	Describe("GetDeployments()", func() {
@@ -105,15 +99,18 @@ var _ = Describe("Service with fake client", func() {
 		})
 
 		It("when deployment is not found", func() {
+			emptyDeployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{},
+			}
 			svc := Service{
-				Client:    emptyClient,
+				Client:    fake.NewSimpleClientset(emptyDeployment),
 				Namespace: namespace,
 			}
 
 			res, err := svc.GetDeployment(ctx, "some-deployment")
 
 			Expect(err.Error()).To(Equal("deployments.apps \"some-deployment\" not found"))
-			Expect(res).To(BeNil())
+			Expect(res).To(Equal(emptyDeployment))
 		})
 	})
 
@@ -264,15 +261,17 @@ var _ = Describe("Service with fake client", func() {
 		})
 
 		It("when config map is not found", func() {
+			emptyConfigMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{},
+			}
 			svc := Service{
-				Client:    emptyClient,
+				Client:    fake.NewSimpleClientset(emptyConfigMap),
 				Namespace: namespace,
 			}
-
 			res, err := svc.GetConfigMap(ctx, "some-config-map")
 
 			Expect(err.Error()).To(Equal("configmaps \"some-config-map\" not found"))
-			Expect(res).To(BeNil())
+			Expect(res).To(Equal(emptyConfigMap))
 		})
 	})
 

@@ -14,6 +14,7 @@ import (
 	"github.com/AirHelp/autoscaler/logger"
 	"github.com/AirHelp/autoscaler/notification"
 	"github.com/AirHelp/autoscaler/notification/slack"
+	"github.com/AirHelp/autoscaler/probe/sqs"
 	"github.com/AirHelp/autoscaler/scaler"
 	flag "github.com/spf13/pflag"
 
@@ -83,14 +84,22 @@ func main() {
 	waitGroup := sync.WaitGroup{}
 
 	for deployment, rawYamlConfig := range configMap.Data {
+		var sqsService *sqs.SQSService
 		var scalerInstance ScalerEntity
 
-		scalerInstance, err := scaler.New(scaler.NewScalerInput{
+		sqsService, err = InitializeSQSService(ctx, rawYamlConfig)
+		if err != nil {
+			zap.S().With("error", err).Errorf("failed to initialize autoscaler for %v: , skipping", deployment)
+			continue
+		}
+
+		scalerInstance, err = scaler.New(scaler.NewScalerInput{
 			Ctx:            ctx,
 			DeploymentName: deployment,
 			RawYamlConfig:  rawYamlConfig,
 			Notifiers:      notifiers,
 			K8sService:     k8sSvc,
+			SQSService:     sqsService,
 			GlobalConfig:   cfg,
 		})
 
@@ -130,4 +139,25 @@ func parseStartingFlags() config.Config {
 	flag.Parse()
 
 	return cfg
+}
+
+func InitializeSQSService(ctx context.Context, rawConfig string) (*sqs.SQSService, error) {
+	var sqsService *sqs.SQSService
+	config, err := scaler.ParseRawScalerConfig(rawConfig)
+	if err != nil {
+		zap.S().Debugf("failed to parse config: %v", err)
+		return sqsService, err
+	}
+
+	if config.Sqs == nil {
+		return sqsService, nil
+	}
+
+	sqsService, err = sqs.NewSQSService(ctx)
+	if err != nil {
+		zap.S().Debugf("failed to initialize SQS client: %v", err)
+		return sqsService, err
+	}
+
+	return sqsService, nil
 }

@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/AirHelp/autoscaler/nginx_stats"
 	"github.com/AirHelp/autoscaler/stat"
+	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"

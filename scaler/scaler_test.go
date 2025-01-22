@@ -3,22 +3,26 @@ package scaler
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/AirHelp/autoscaler/probe/sqs/mocks"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/h2non/gock.v1"
 
 	"github.com/AirHelp/autoscaler/config"
 	"github.com/AirHelp/autoscaler/notification"
 	notificationMock "github.com/AirHelp/autoscaler/notification/mock"
 	probeMock "github.com/AirHelp/autoscaler/probe/mock"
+	sqsProbe "github.com/AirHelp/autoscaler/probe/sqs"
 	scalerMock "github.com/AirHelp/autoscaler/scaler/mock"
 	"github.com/AirHelp/autoscaler/testdata"
 	"github.com/alicebob/miniredis/v2"
+
+	uberGomock "go.uber.org/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -37,11 +41,6 @@ var _ = Describe("Scaler", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
-
-		_ = os.Setenv("AWS_REGION", "eu-west-1")
-		_ = os.Setenv("AWS_ACCESS_KEY_ID", "aaa")
-		_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "bbb")
-
 		mockCtrl = gomock.NewController(GinkgoT())
 
 		notifierMock = notificationMock.NewMockNotifier(mockCtrl)
@@ -50,33 +49,17 @@ var _ = Describe("Scaler", func() {
 
 	AfterEach(func() {
 		mockCtrl.Finish()
-		os.Unsetenv("AWS_REGION")
-		os.Unsetenv("AWS_ACCESS_KEY_ID")
-		os.Unsetenv("AWS_SECRET_ACCESS_KEY")
 	})
 
 	Describe("New()", func() {
 		var (
 			rawYamlConfig = ""
-
-			input      NewScalerInput
-			deployment appsv1.Deployment
+			input         NewScalerInput
+			deployment    appsv1.Deployment
 		)
 
 		BeforeEach(func() {
-			gock.DisableNetworking()
-
 			rawYamlConfig = testdata.LoadFixture("autoscaler-config.yaml")
-
-			// Mock QueueName -> QueueUrl translation
-			sqsGetQueueResponse := testdata.LoadFixture("sqs-get-queue-url-response.txt")
-			gock.New("https://sqs.eu-west-1.amazonaws.com").
-				Post("/").
-				BodyString(`Action=GetQueueUrl&QueueName=q1*`).
-				Reply(200).
-				BodyString(sqsGetQueueResponse)
-			// Mock authorization requests
-			gock.New("https://sqs.eu-west-1.amazonaws.com").Post("/").Reply(200)
 
 			r := int32(9)
 			deployment = appsv1.Deployment{
@@ -96,18 +79,31 @@ var _ = Describe("Scaler", func() {
 				K8sService:     k8sServiceMock,
 				GlobalConfig:   globalConfig,
 			}
-
 		})
 
 		AfterEach(func() {
 			rawYamlConfig = ""
 			input = NewScalerInput{}
-
-			gock.Off()
 		})
 
 		It("When all good it properly build scaler instance", func() {
+			mockCtrl := uberGomock.NewController(GinkgoT())
+			mockSqs := sqsMock.NewMockSqsClient(mockCtrl)
+
+			queInput := &sqs.GetQueueUrlInput{
+				QueueName: aws.String("q1"),
+			}
+			queOutput := &sqs.GetQueueUrlOutput{
+				QueueUrl: aws.String("https://sqs.eu-west-1.amazonaws.com/123456789012/q1"),
+			}
+			sqsService := &sqsProbe.SQSService{
+				Client: mockSqs,
+			}
+
+			input.SQSService = sqsService
+
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
+			mockSqs.EXPECT().GetQueueUrl(ctx, queInput).Return(queOutput, nil)
 
 			sc, err := New(input)
 
@@ -119,6 +115,7 @@ var _ = Describe("Scaler", func() {
 			Expect(sc.notifiers[0]).To(Equal(notifierMock))
 			Expect(sc.k8sService).To(Equal(k8sServiceMock))
 			Expect(sc.globalConfig).To(Equal(globalConfig))
+			mockCtrl.Finish()
 		})
 
 		It("When Redis probe requested it properly creates Redis based scaler", func() {
