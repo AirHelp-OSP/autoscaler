@@ -11,7 +11,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/slack-go/slack v0.15.0
+	github.com/slack-go/slack v0.16.0
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
