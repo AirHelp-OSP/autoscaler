@@ -1,6 +1,6 @@
 module github.com/AirHelp/autoscaler
 
-go 1.24.2
+go 1.25.0
 
 require (
 	github.com/alicebob/miniredis/v2 v2.34.0
