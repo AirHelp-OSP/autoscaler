@@ -12,7 +12,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.37.0
 	github.com/slack-go/slack v0.17.3
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.7
 	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
 	gopkg.in/h2non/gock.v1 v1.1.2
