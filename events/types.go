@@ -32,18 +32,6 @@ func (e *ScalingEventData) ToJSON() string {
 }
 
 func (e *ScalingEventData) BuildHumanMessage() string {
-	if e.ScalingDirection == "none" {
-		return fmt.Sprintf(
-			"Remaining at %d replicas | %s: %d/%d (%.1f%%) | Reason: %s",
-			e.CurrentReplicas,
-			e.ProbeType,
-			e.ProbeValue,
-			e.Threshold,
-			e.LoadPercentage,
-			e.ScalingReason,
-		)
-	}
-
 	return fmt.Sprintf(
 		"Scaled %s from %d to %d replicas | %s: %d/%d (%.1f%%) | Reason: %s",
 		e.ScalingDirection,

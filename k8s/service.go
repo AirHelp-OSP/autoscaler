@@ -84,9 +84,6 @@ func (s *Service) CreateScalingEvent(ctx context.Context, deployment *appsv1.Dep
 	}
 
 	reason := "Scaled" + capitalizeFirst(eventData.ScalingDirection)
-	if eventData.ScalingDirection == "none" {
-		reason = "NoChange"
-	}
 
 	event := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{

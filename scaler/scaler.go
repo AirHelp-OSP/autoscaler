@@ -307,9 +307,6 @@ func (s *Scaler) buildEventData(decision decision, probeResult int) *events.Scal
 		} else {
 			scalingReason = "low_load"
 		}
-	default:
-		scalingDirection = "none"
-		scalingReason = "optimal"
 	}
 	
 	eventData := &events.ScalingEventData{
