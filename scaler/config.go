@@ -47,7 +47,7 @@ func NewScalerConfigWithDefaults() Config {
 		},
 		CheckInterval:  time.Minute,
 		CooldownPeriod: time.Minute * 5,
-		EnableEvents:   false,
+		EnableEvents:   true,
 	}
 }
 
