@@ -1,7 +1,6 @@
 package events
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -24,11 +23,6 @@ type ScalingEventData struct {
 	Timestamp      int64  `json:"timestamp"`
 
 	HumanMessage string `json:"human_message"`
-}
-
-func (e *ScalingEventData) ToJSON() string {
-	data, _ := json.Marshal(e)
-	return string(data)
 }
 
 func (e *ScalingEventData) BuildHumanMessage() string {

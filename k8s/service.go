@@ -90,7 +90,6 @@ func (s *Service) CreateScalingEvent(ctx context.Context, deployment *appsv1.Dep
 			Name:      fmt.Sprintf("%s.%d", deployment.Name, now.UnixNano()),
 			Namespace: s.Namespace,
 
-			// for easy filtering in Grafana
 			Labels: map[string]string{
 				"probe-type":           eventData.ProbeType,
 				"scaling-direction":    eventData.ScalingDirection,
@@ -100,7 +99,6 @@ func (s *Service) CreateScalingEvent(ctx context.Context, deployment *appsv1.Dep
 				"scaling-namespace":    eventData.Namespace,
 			},
 
-			// for detailed metrics
 			Annotations: map[string]string{
 				"current-replicas":  strconv.Itoa(eventData.CurrentReplicas),
 				"target-replicas":   strconv.Itoa(eventData.TargetReplicas),
@@ -110,7 +108,6 @@ func (s *Service) CreateScalingEvent(ctx context.Context, deployment *appsv1.Dep
 				"min-pods":          strconv.Itoa(eventData.MinPods),
 				"max-pods":          strconv.Itoa(eventData.MaxPods),
 				"scaling-timestamp": strconv.FormatInt(eventData.Timestamp, 10),
-				"event-data":        eventData.ToJSON(),
 			},
 		},
 
