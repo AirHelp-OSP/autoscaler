@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	events "github.com/AirHelp/autoscaler/events"
 	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/apps/v1"
 	v10 "k8s.io/api/core/v1"
@@ -79,4 +80,18 @@ func (m *MockK8SClient) ScaleDeployment(arg0 context.Context, arg1 *v1.Deploymen
 func (mr *MockK8SClientMockRecorder) ScaleDeployment(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScaleDeployment", reflect.TypeOf((*MockK8SClient)(nil).ScaleDeployment), arg0, arg1, arg2)
+}
+
+// CreateScalingEvent mocks base method.
+func (m *MockK8SClient) CreateScalingEvent(arg0 context.Context, arg1 *v1.Deployment, arg2 *events.ScalingEventData) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateScalingEvent", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateScalingEvent indicates an expected call of CreateScalingEvent.
+func (mr *MockK8SClientMockRecorder) CreateScalingEvent(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateScalingEvent", reflect.TypeOf((*MockK8SClient)(nil).CreateScalingEvent), arg0, arg1, arg2)
 }

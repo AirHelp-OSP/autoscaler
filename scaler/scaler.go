@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/AirHelp/autoscaler/config"
+	"github.com/AirHelp/autoscaler/events"
 	"github.com/AirHelp/autoscaler/helper"
 	"github.com/AirHelp/autoscaler/notification"
 	"github.com/AirHelp/autoscaler/probe"
@@ -58,6 +59,7 @@ type NewScalerInput struct {
 type K8SClient interface {
 	GetDeployment(context.Context, string) (*appsv1.Deployment, error)
 	ScaleDeployment(context.Context, *appsv1.Deployment, int) (*appsv1.Deployment, error)
+	CreateScalingEvent(context.Context, *appsv1.Deployment, *events.ScalingEventData) error
 
 	nginx.K8SClient
 }
@@ -179,6 +181,16 @@ func (s *Scaler) perform(ctx context.Context) {
 			scalerLogger.With("error", err).Warn("updating replication failed")
 		}
 
+		if s.scalerConfig.EnableEvents {
+			eventData := s.buildEventData(decision, probeResult)
+			
+			if err := s.k8sService.CreateScalingEvent(ctx, s.deployment, eventData); err != nil {
+				scalerLogger.With("error", err).Warn("failed to create scaling event")
+			} else {
+				scalerLogger.Infof("created rich Kubernetes event: %s (load: %.1f%%)", eventData.ScalingDirection, eventData.LoadPercentage)
+			}
+		}
+
 		s.lastActionAt = currentTime
 
 		if len(s.notifiers) > 0 {
@@ -273,6 +285,52 @@ func (s *Scaler) isDeploymentNotAtTargetReplicas() bool {
 
 func (s *Scaler) isAutoscalerInCooldown(currentTime time.Time) bool {
 	return !s.lastActionAt.IsZero() && s.deployment.Status.Replicas != int32(0) && s.lastActionAt.After(currentTime.Add(-s.scalerConfig.CooldownPeriod))
+}
+
+
+func (s *Scaler) buildEventData(decision decision, probeResult int) *events.ScalingEventData {
+	loadPercentage := float64(probeResult) / float64(s.scalerConfig.Threshold) * 100
+	
+	var scalingDirection, scalingReason string
+	switch decision.value {
+	case scaleUp:
+		scalingDirection = "up"
+		if decision.target == s.scalerConfig.ApplicableLimits().MaximumNumberOfPods {
+			scalingReason = "at_max_limit"
+		} else {
+			scalingReason = "high_load"
+		}
+	case scaleDown:
+		scalingDirection = "down"
+		if decision.target == s.scalerConfig.ApplicableLimits().MinimumNumberOfPods {
+			scalingReason = "at_min_limit"
+		} else {
+			scalingReason = "low_load"
+		}
+	default:
+		scalingDirection = "none"
+		scalingReason = "optimal"
+	}
+	
+	eventData := &events.ScalingEventData{
+		CurrentReplicas:  decision.current,
+		TargetReplicas:   decision.target,
+		ProbeValue:       probeResult,
+		Threshold:        s.scalerConfig.Threshold,
+		LoadPercentage:   loadPercentage,
+		MinPods:          s.scalerConfig.ApplicableLimits().MinimumNumberOfPods,
+		MaxPods:          s.scalerConfig.ApplicableLimits().MaximumNumberOfPods,
+		ScalingDirection: scalingDirection,
+		ProbeType:        s.probe.Kind(),
+		ScalingReason:    scalingReason,
+		DeploymentName:   s.deployment.Name,
+		Namespace:        s.deployment.Namespace,
+		Environment:      s.globalConfig.Environment,
+		Timestamp:        time.Now().Unix(),
+	}
+	
+	eventData.HumanMessage = eventData.BuildHumanMessage()
+	return eventData
 }
 
 func ParseRawScalerConfig(rawConfig string) (Config, error) {
