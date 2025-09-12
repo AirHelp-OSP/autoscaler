@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 
+	"github.com/AirHelp/autoscaler/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -323,6 +324,165 @@ var _ = Describe("Service with fake client", func() {
 			// Check if change is applied on k8s side too
 			deploymentFromApi, _ := client.AppsV1().Deployments(namespace).Get(ctx, deployment.ObjectMeta.Name, metav1.GetOptions{})
 			Expect(*deploymentFromApi.Spec.Replicas).To(Equal(int32(1)))
+		})
+	})
+
+	Describe("CreateScalingEvent()", func() {
+		var deployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			r := int32(2)
+			deployment = &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-deployment",
+					Namespace:       namespace,
+					UID:             "test-uid-123",
+					ResourceVersion: "12345",
+				},
+				Spec: appsv1.DeploymentSpec{Replicas: &r},
+			}
+
+			client = fake.NewSimpleClientset(deployment)
+		})
+
+		It("successfully creates a rich scaling event for scale up", func() {
+			svc := Service{
+				Client:    client,
+				Namespace: namespace,
+			}
+
+			eventData := &events.ScalingEventData{
+				CurrentReplicas:  2,
+				TargetReplicas:   3,
+				ProbeValue:       150,
+				Threshold:        100,
+				LoadPercentage:   150.0,
+				MinPods:          1,
+				MaxPods:          10,
+				ScalingDirection: "up",
+				ProbeType:        "sqs",
+				ScalingReason:    "high_load",
+				DeploymentName:   "test-deployment",
+				Namespace:        namespace,
+				Environment:      "test",
+				Timestamp:        1736432512,
+				HumanMessage:     "Scaled up from 2 to 3 replicas | sqs: 150/100 (150.0%) | Reason: high_load",
+			}
+
+			err := svc.CreateScalingEvent(ctx, deployment, eventData)
+
+			Expect(err).ToNot(HaveOccurred())
+
+			kubeEvents, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeEvents.Items).To(HaveLen(1))
+
+			event := kubeEvents.Items[0]
+			Expect(event.InvolvedObject.Kind).To(Equal("Deployment"))
+			Expect(event.InvolvedObject.APIVersion).To(Equal("apps/v1"))
+			Expect(event.InvolvedObject.Name).To(Equal("test-deployment"))
+			Expect(event.InvolvedObject.Namespace).To(Equal(namespace))
+			Expect(event.InvolvedObject.UID).To(Equal(deployment.UID))
+			Expect(event.InvolvedObject.ResourceVersion).To(Equal(deployment.ResourceVersion))
+			Expect(event.Reason).To(Equal("ScaledUp"))
+			Expect(event.Message).To(Equal("Scaled up from 2 to 3 replicas | sqs: 150/100 (150.0%) | Reason: high_load"))
+			Expect(event.Type).To(Equal("Normal"))
+			Expect(event.Source.Component).To(Equal("autoscaler"))
+			Expect(event.Count).To(Equal(int32(1)))
+
+			Expect(event.Labels["probe-type"]).To(Equal("sqs"))
+			Expect(event.Labels["scaling-direction"]).To(Equal("up"))
+			Expect(event.Labels["scaling-environment"]).To(Equal("test"))
+			Expect(event.Annotations["current-replicas"]).To(Equal("2"))
+			Expect(event.Annotations["target-replicas"]).To(Equal("3"))
+			Expect(event.Annotations["probe-value"]).To(Equal("150"))
+			Expect(event.Annotations["load-percentage"]).To(Equal("150.00"))
+		})
+
+		It("successfully creates a scaling event for scale down", func() {
+			svc := Service{
+				Client:    client,
+				Namespace: namespace,
+			}
+
+			eventData := &events.ScalingEventData{
+				CurrentReplicas:  2,
+				TargetReplicas:   1,
+				ProbeValue:       25,
+				Threshold:        100,
+				LoadPercentage:   25.0,
+				MinPods:          1,
+				MaxPods:          10,
+				ScalingDirection: "down",
+				ProbeType:        "sqs",
+				ScalingReason:    "low_load",
+				DeploymentName:   "test-deployment",
+				Namespace:        namespace,
+				Environment:      "test",
+				Timestamp:        1736432512,
+				HumanMessage:     "Scaled down from 2 to 1 replicas | sqs: 25/100 (25.0%) | Reason: low_load",
+			}
+
+			err := svc.CreateScalingEvent(ctx, deployment, eventData)
+
+			Expect(err).ToNot(HaveOccurred())
+
+			kubeEvents, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeEvents.Items).To(HaveLen(1))
+
+			event := kubeEvents.Items[0]
+			Expect(event.Reason).To(Equal("ScaledDown"))
+			Expect(event.Message).To(Equal("Scaled down from 2 to 1 replicas | sqs: 25/100 (25.0%) | Reason: low_load"))
+			Expect(event.Type).To(Equal("Normal"))
+		})
+
+		It("creates events with unique names based on timestamp", func() {
+			svc := Service{
+				Client:    client,
+				Namespace: namespace,
+			}
+
+			eventData1 := &events.ScalingEventData{
+				CurrentReplicas:  1,
+				TargetReplicas:   2,
+				ProbeValue:       120,
+				Threshold:        100,
+				LoadPercentage:   120.0,
+				ScalingDirection: "up",
+				ProbeType:        "sqs",
+				ScalingReason:    "high_load",
+				DeploymentName:   "test-deployment",
+				Namespace:        namespace,
+				Environment:      "test",
+				HumanMessage:     "first scaling event",
+			}
+			err1 := svc.CreateScalingEvent(ctx, deployment, eventData1)
+			Expect(err1).ToNot(HaveOccurred())
+
+			eventData2 := &events.ScalingEventData{
+				CurrentReplicas:  2,
+				TargetReplicas:   1,
+				ProbeValue:       50,
+				Threshold:        100,
+				LoadPercentage:   50.0,
+				ScalingDirection: "down",
+				ProbeType:        "sqs",
+				ScalingReason:    "low_load",
+				DeploymentName:   "test-deployment",
+				Namespace:        namespace,
+				Environment:      "test",
+				HumanMessage:     "second scaling event",
+			}
+			err2 := svc.CreateScalingEvent(ctx, deployment, eventData2)
+			Expect(err2).ToNot(HaveOccurred())
+
+			kubeEvents, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeEvents.Items).To(HaveLen(2))
+			Expect(kubeEvents.Items[0].Name).To(ContainSubstring("test-deployment."))
+			Expect(kubeEvents.Items[1].Name).To(ContainSubstring("test-deployment."))
+			Expect(kubeEvents.Items[0].Name).ToNot(Equal(kubeEvents.Items[1].Name))
 		})
 	})
 })

@@ -3,12 +3,15 @@ package k8s
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
+	"github.com/AirHelp/autoscaler/events"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -60,7 +63,7 @@ func (s *Service) ScaleDeployment(ctx context.Context, deployment *appsv1.Deploy
 	return s.Client.AppsV1().Deployments(s.Namespace).Update(ctx, deployment, metav1.UpdateOptions{})
 }
 
-func (s *Service) GetPodsFromDeployment(ctx context.Context, deployment *appsv1.Deployment, additionalLabels map[string]string) (*v1.PodList, error) {
+func (s *Service) GetPodsFromDeployment(ctx context.Context, deployment *appsv1.Deployment, additionalLabels map[string]string) (*corev1.PodList, error) {
 	selectorLabels := labels.Set(deployment.Spec.Selector.MatchLabels)
 
 	for label, value := range additionalLabels {
@@ -70,6 +73,75 @@ func (s *Service) GetPodsFromDeployment(ctx context.Context, deployment *appsv1.
 	options := metav1.ListOptions{LabelSelector: selectorLabels.String()}
 
 	return s.Client.CoreV1().Pods(s.Namespace).List(ctx, options)
+}
+
+func (s *Service) CreateScalingEvent(ctx context.Context, deployment *appsv1.Deployment, eventData *events.ScalingEventData) error {
+	now := metav1.NewTime(time.Now())
+
+	eventType := "Normal"
+	if eventData.ScalingReason == "at_max_limit" || eventData.ScalingReason == "at_min_limit" {
+		eventType = "Warning"
+	}
+
+	reason := "Scaled" + capitalizeFirst(eventData.ScalingDirection)
+
+	event := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s.%d", deployment.Name, now.UnixNano()),
+			Namespace: s.Namespace,
+
+			Labels: map[string]string{
+				"probe-type":           eventData.ProbeType,
+				"scaling-direction":    eventData.ScalingDirection,
+				"scaling-reason":       eventData.ScalingReason,
+				"scaled-deployment":    eventData.DeploymentName,
+				"scaling-environment":  eventData.Environment,
+				"scaling-namespace":    eventData.Namespace,
+			},
+
+			Annotations: map[string]string{
+				"current-replicas":  strconv.Itoa(eventData.CurrentReplicas),
+				"target-replicas":   strconv.Itoa(eventData.TargetReplicas),
+				"probe-value":       strconv.Itoa(eventData.ProbeValue),
+				"threshold":         strconv.Itoa(eventData.Threshold),
+				"load-percentage":   fmt.Sprintf("%.2f", eventData.LoadPercentage),
+				"min-pods":          strconv.Itoa(eventData.MinPods),
+				"max-pods":          strconv.Itoa(eventData.MaxPods),
+				"scaling-timestamp": strconv.FormatInt(eventData.Timestamp, 10),
+			},
+		},
+
+		InvolvedObject: corev1.ObjectReference{
+			Kind:            "Deployment",
+			APIVersion:      "apps/v1",
+			Name:            deployment.Name,
+			Namespace:       deployment.Namespace,
+			UID:             deployment.UID,
+			ResourceVersion: deployment.ResourceVersion,
+		},
+
+		Reason:  reason,
+		Message: eventData.HumanMessage,
+		Source: corev1.EventSource{
+			Component: "autoscaler",
+			Host:      fmt.Sprintf("autoscaler-%s", eventData.Environment),
+		},
+
+		FirstTimestamp: now,
+		LastTimestamp:  now,
+		Count:          1,
+		Type:           eventType,
+	}
+
+	_, err := s.Client.CoreV1().Events(s.Namespace).Create(ctx, event, metav1.CreateOptions{})
+	return err
+}
+
+func capitalizeFirst(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return fmt.Sprintf("%c%s", s[0]-32, s[1:])
 }
 
 func generateKubeConfig() (*rest.Config, error) {

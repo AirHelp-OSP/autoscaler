@@ -30,6 +30,8 @@ type Config struct {
 	CooldownPeriod time.Duration `yaml:"cooldown_period"`
 	Threshold      int           `yaml:"threshold"`
 
+	EnableEvents bool `yaml:"enable_events"`
+
 	HourlyConfig []*HourlyConfig `yaml:"hourly_config"`
 
 	Sqs   *sqs.Config   `yaml:"sqs"`
@@ -45,6 +47,7 @@ func NewScalerConfigWithDefaults() Config {
 		},
 		CheckInterval:  time.Minute,
 		CooldownPeriod: time.Minute * 5,
+		EnableEvents:   true,
 	}
 }
 

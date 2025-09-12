@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AirHelp/autoscaler/events"
 	"github.com/AirHelp/autoscaler/probe/sqs/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -234,6 +235,7 @@ var _ = Describe("Scaler", func() {
 					},
 					Threshold:      20,
 					CooldownPeriod: 5 * time.Minute,
+					EnableEvents:   true,
 				}
 
 				sc = Scaler{
@@ -266,10 +268,35 @@ var _ = Describe("Scaler", func() {
 					probeInstanceMock.EXPECT().Kind().Return("sqs").AnyTimes()
 					k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 					k8sServiceMock.EXPECT().ScaleDeployment(ctx, &deployment, 5)
+					k8sServiceMock.EXPECT().CreateScalingEvent(ctx, &deployment, gomock.Any()).Do(func(ctx context.Context, deployment *appsv1.Deployment, eventData *events.ScalingEventData) {
+						Expect(eventData.ScalingDirection).To(Equal("up"))
+						Expect(eventData.CurrentReplicas).To(Equal(4))
+						Expect(eventData.TargetReplicas).To(Equal(5))
+						Expect(eventData.ProbeType).To(Equal("sqs"))
+						Expect(eventData.ScalingReason).To(Equal("at_max_limit")) // Scaling to max limit (5)
+					})
 					notifierMock.EXPECT().Notify(ctx, gomock.Any()).DoAndReturn(
 						func(_ context.Context, payload notification.NotificationPayload) error {
 							Expect(payload.Decision).To(Equal("scale up deployment from 4 to 5 replicas"))
 							Expect(payload.DeploymentName).To(Equal("test-deployment"))
+							return nil
+						},
+					)
+
+					sc.perform(ctx)
+					Expect(sc.lastTenResults).To(Equal([]int{500}))
+				})
+
+				It("Does not create events when EnableEvents is false", func() {
+					sc.scalerConfig.EnableEvents = false
+					
+					probeInstanceMock.EXPECT().Check(ctx).Return(500, nil)
+					probeInstanceMock.EXPECT().Kind().Return("sqs").AnyTimes()
+					k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
+					k8sServiceMock.EXPECT().ScaleDeployment(ctx, &deployment, 5)
+					notifierMock.EXPECT().Notify(ctx, gomock.Any()).DoAndReturn(
+						func(_ context.Context, payload notification.NotificationPayload) error {
+							Expect(payload.Decision).To(Equal("scale up deployment from 4 to 5 replicas"))
 							return nil
 						},
 					)
@@ -283,6 +310,13 @@ var _ = Describe("Scaler", func() {
 					probeInstanceMock.EXPECT().Kind().Return("sqs").AnyTimes()
 					k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 					k8sServiceMock.EXPECT().ScaleDeployment(ctx, &deployment, 3)
+					k8sServiceMock.EXPECT().CreateScalingEvent(ctx, &deployment, gomock.Any()).Do(func(ctx context.Context, deployment *appsv1.Deployment, eventData *events.ScalingEventData) {
+						Expect(eventData.ScalingDirection).To(Equal("down"))
+						Expect(eventData.CurrentReplicas).To(Equal(4))
+						Expect(eventData.TargetReplicas).To(Equal(3))
+						Expect(eventData.ProbeType).To(Equal("sqs"))
+						Expect(eventData.ScalingReason).To(Equal("low_load"))
+					})
 					notifierMock.EXPECT().Notify(ctx, gomock.Any()).DoAndReturn(
 						func(_ context.Context, payload notification.NotificationPayload) error {
 							Expect(payload.Decision).To(Equal("scale down deployment from 4 to 3 replicas"))
@@ -335,6 +369,13 @@ var _ = Describe("Scaler", func() {
 
 						k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 						k8sServiceMock.EXPECT().ScaleDeployment(ctx, &deployment, 1)
+						k8sServiceMock.EXPECT().CreateScalingEvent(ctx, &deployment, gomock.Any()).Do(func(ctx context.Context, deployment *appsv1.Deployment, eventData *events.ScalingEventData) {
+							Expect(eventData.ScalingDirection).To(Equal("up"))
+							Expect(eventData.CurrentReplicas).To(Equal(0))
+							Expect(eventData.TargetReplicas).To(Equal(1))
+							Expect(eventData.ProbeType).To(Equal("sqs"))
+							Expect(eventData.ScalingReason).To(Equal("high_load"))
+						})
 
 						notifierMock.EXPECT().Notify(ctx, gomock.Any()).Return(nil)
 
