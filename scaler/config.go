@@ -7,6 +7,7 @@ import (
 	"github.com/AirHelp/autoscaler/probe/nginx"
 	"github.com/AirHelp/autoscaler/probe/redis"
 	"github.com/AirHelp/autoscaler/probe/sqs"
+	"github.com/AirHelp/autoscaler/probe/valkey"
 	"go.uber.org/zap"
 )
 
@@ -34,9 +35,10 @@ type Config struct {
 
 	HourlyConfig []*HourlyConfig `yaml:"hourly_config"`
 
-	Sqs   *sqs.Config   `yaml:"sqs"`
-	Redis *redis.Config `yaml:"redis"`
-	Nginx *nginx.Config `yaml:"nginx"`
+	Sqs    *sqs.Config    `yaml:"sqs"`
+	Redis  *redis.Config  `yaml:"redis"`
+	Valkey *valkey.Config `yaml:"valkey"`
+	Nginx  *nginx.Config  `yaml:"nginx"`
 }
 
 func NewScalerConfigWithDefaults() Config {
