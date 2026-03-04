@@ -33,6 +33,7 @@ Autoscaler currently supports probes based on:
 
 * [AWS SQS](https://aws.amazon.com/sqs/)
 * [Redis](https://redis.io/)
+* [Valkey](https://valkey.io/) (Redis-compatible key-value store)
 * [Nginx](https://nginx.org/) (for web traffic serving deployments)
 
 Generic features:
@@ -101,6 +102,9 @@ Parameters for inner config:
 | redis                                  | true (one probe config is required) | hash                  | n/a                       | config for Redis probe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | redis.hosts                            | true                                | Array\<string\>       | n/a                       | list of hosts Redis (needs to include port)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | redis.list_keys                        | true                                | Array\<string\>       | n/a                       | collection of list type keys to check length for                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| valkey                                 | true (one probe config is required) | hash                  | n/a                       | config for Valkey probe (Redis-compatible)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| valkey.hosts                           | true                                | Array\<string\>       | n/a                       | list of hosts Valkey (needs to include port)                                                                                                                                                                                                                                                                                                                                                                                                 |
+| valkey.list_keys                       | true                                | Array\<string\>       | n/a                       | collection of list type keys to check length for                                                                                                                                                                                                                                                                                                                                                                                             |
 | nginx                                  | true (one probe config is required) | hash                  | n/a                       | config for Nginx probe (for Web deployments)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | nginx.endpoint                         | false                               | string                | /stats/active_connections | endpoint which serves active connections statistics in pod                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | nginx.statistic                        | false                               | string                | maximum                   | statistic use to calculate value for connections occupied. Appliable statistics: `median`, `average` and `maximum`                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -142,6 +146,19 @@ data:
       hosts:
         - redis1:6379
         - redis2:6379
+      list_keys:
+        - autoscaler_test_1
+        - autoscaler_test_2
+  valkey-deployment: |
+    minimum_number_of_pods: 0
+    maximum_number_of_pods: 5
+    check_interval: 15s
+    cooldown_period: 60s
+    threshold: 100
+    valkey:
+      hosts:
+        - valkey1:6379
+        - valkey2:6379
       list_keys:
         - autoscaler_test_1
         - autoscaler_test_2

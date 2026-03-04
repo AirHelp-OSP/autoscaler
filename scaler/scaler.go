@@ -19,6 +19,7 @@ import (
 	"github.com/AirHelp/autoscaler/probe/nginx"
 	"github.com/AirHelp/autoscaler/probe/redis"
 	"github.com/AirHelp/autoscaler/probe/sqs"
+	"github.com/AirHelp/autoscaler/probe/valkey"
 )
 
 const (
@@ -103,6 +104,8 @@ func New(i NewScalerInput) (*Scaler, error) {
 		requestedProbe, err = sqs.New(i.Ctx, s.scalerConfig.Sqs, s.sqsService)
 	case s.scalerConfig.Redis != nil:
 		requestedProbe, err = redis.New(s.scalerConfig.Redis)
+	case s.scalerConfig.Valkey != nil:
+		requestedProbe, err = valkey.New(s.scalerConfig.Valkey)
 	case s.scalerConfig.Nginx != nil:
 		requestedProbe, err = nginx.New(s.scalerConfig.Nginx, i.K8sService, s.deployment)
 	default:

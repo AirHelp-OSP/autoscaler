@@ -4,3 +4,4 @@ autoscaler
 bin/
 
 *.log
+tmp/

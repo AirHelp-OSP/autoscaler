@@ -139,6 +139,25 @@ var _ = Describe("Scaler", func() {
 			Expect(sc.globalConfig).To(Equal(globalConfig))
 		})
 
+		It("When Valkey probe requested it properly creates Valkey based scaler", func() {
+			server, err := miniredis.Run()
+			Expect(err).ToNot(HaveOccurred())
+			defer server.Close()
+
+			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
+			input.RawYamlConfig = strings.Replace(testdata.LoadFixture("autoscaler-config-valkey.yaml"), "localhost:6379", server.Addr(), 1)
+
+			sc, err := New(input)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sc.deploymentName).To(Equal(deploymentName))
+			Expect(sc.deployment).To(Equal(&deployment))
+			Expect(sc.probe.Kind()).To(Equal("valkey"))
+			Expect(sc.notifiers[0]).To(Equal(notifierMock))
+			Expect(sc.k8sService).To(Equal(k8sServiceMock))
+			Expect(sc.globalConfig).To(Equal(globalConfig))
+		})
+
 		It("When Nginx probe requested it properly creates Nginx based scaler", func() {
 			k8sServiceMock.EXPECT().GetDeployment(ctx, deploymentName).Return(&deployment, nil)
 			input.RawYamlConfig = testdata.LoadFixture("autoscaler-config-nginx.yaml")
