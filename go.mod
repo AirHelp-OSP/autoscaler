@@ -10,7 +10,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/onsi/ginkgo/v2 v2.28.3
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/gomega v1.41.0
 	github.com/slack-go/slack v0.23.1
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/mock v0.6.0
