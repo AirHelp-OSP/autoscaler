@@ -166,6 +166,26 @@ hosts:
 			Expect(opts.TLSConfig.ServerName).To(Equal("tls-host"))
 		})
 
+		DescribeTable("Rejects hosts that would fall back to localhost",
+			func(host Host) {
+				_, err := host.options()
+
+				Expect(err).To(HaveOccurred())
+			},
+			Entry("empty object", Host{}),
+			Entry("unset address env", Host{Address: "${REDIS_UNSET_ADDR}"}),
+			Entry("unset host in address", Host{Address: "${REDIS_UNSET_HOST}:6379"}),
+			Entry("unset url env", Host{URL: "${REDIS_UNSET_URL}"}),
+			Entry("unset host in url", Host{URL: "rediss://:pass@${REDIS_UNSET_HOST}:6379"}),
+		)
+
+		It("Does not leak url password in error", func() {
+			_, err := Host{URL: "rediss://:s3cret@:6379"}.options()
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).ToNot(ContainSubstring("s3cret"))
+		})
+
 		It("Enables TLS for rediss url", func() {
 			opts, err := Host{URL: "rediss://:pass@tls-host:6379"}.options()
 

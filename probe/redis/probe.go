@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 
 	"github.com/go-redis/redis/v8"
@@ -34,8 +35,13 @@ func (h *Host) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (h Host) options() (*redis.Options, error) {
+	// go-redis silently falls back to localhost for an empty host, e.g. from an unset env var.
 	if h.URL != "" {
-		return redis.ParseURL(os.ExpandEnv(h.URL))
+		expanded := os.ExpandEnv(h.URL)
+		if u, err := url.Parse(expanded); err != nil || u.Hostname() == "" {
+			return nil, fmt.Errorf("redis url has no host")
+		}
+		return redis.ParseURL(expanded)
 	}
 
 	opts := &redis.Options{
@@ -43,11 +49,12 @@ func (h Host) options() (*redis.Options, error) {
 		Password: os.ExpandEnv(h.Password),
 	}
 
+	host, _, err := net.SplitHostPort(opts.Addr)
+	if err != nil || host == "" {
+		return nil, fmt.Errorf("invalid redis address %q, expected host:port", opts.Addr)
+	}
+
 	if h.TLS {
-		host, _, err := net.SplitHostPort(opts.Addr)
-		if err != nil {
-			return nil, err
-		}
 		opts.TLSConfig = &tls.Config{ServerName: host}
 	}
 
