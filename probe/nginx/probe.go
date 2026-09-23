@@ -219,14 +219,23 @@ func (p *Probe) fetchActiveConnectionsFromPods(pods *corev1.PodList) (map[string
 		go getStatsFunc(pod)
 	}
 
+	// Drain every result, even after an error, so no goroutine is left blocked on the channel.
+	var firstErr error
 	for range pods.Items {
 		result := <-statsChan
 
 		if result.err != nil {
-			return map[string]int{}, result.err
+			if firstErr == nil {
+				firstErr = result.err
+			}
+			continue
 		}
 
 		results[result.pod.ObjectMeta.Name] = result.activeConnections
+	}
+
+	if firstErr != nil {
+		return map[string]int{}, firstErr
 	}
 
 	return results, nil

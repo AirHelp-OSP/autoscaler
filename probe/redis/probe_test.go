@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v2"
 
 	"github.com/alicebob/miniredis/v2"
 )
@@ -33,7 +34,7 @@ var _ = Describe("Probe", func() {
 
 		Context("When list keys empty", func() {
 			It("Returns error", func() {
-				config.Hosts = []string{"host:6379"}
+				config.Hosts = []Host{{Address: "host:6379"}}
 
 				probe, err := New(&config)
 
@@ -45,7 +46,7 @@ var _ = Describe("Probe", func() {
 
 		Context("When host is not reachable", func() {
 			It("Returns error", func() {
-				config.Hosts = []string{"host:6379"}
+				config.Hosts = []Host{{Address: "host:6379"}}
 				config.ListKeys = []string{"asdf"}
 
 				probe, err := New(&config)
@@ -68,7 +69,7 @@ var _ = Describe("Probe", func() {
 				}
 
 				config = Config{
-					Hosts:    []string{server.Addr()},
+					Hosts:    []Host{{Address: server.Addr()}},
 					ListKeys: []string{"asdf"},
 				}
 			})
@@ -88,6 +89,109 @@ var _ = Describe("Probe", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(pingRes).To(Equal("PONG"))
 			})
+		})
+
+		Context("When auth is required", func() {
+			var server *miniredis.Miniredis
+			var err error
+
+			BeforeEach(func() {
+				server, err = miniredis.Run()
+
+				if err != nil {
+					Fail("miniredis failed to start")
+				}
+
+				server.RequireAuth("secret")
+				GinkgoT().Setenv("REDIS_PASSWORD", "secret")
+				GinkgoT().Setenv("REDIS_URL", fmt.Sprintf("redis://:secret@%s", server.Addr()))
+				config.ListKeys = []string{"asdf"}
+			})
+
+			AfterEach(func() {
+				server.Close()
+			})
+
+			It("Connects with password from env", func() {
+				config.Hosts = []Host{{Address: server.Addr(), Password: "${REDIS_PASSWORD}"}}
+
+				_, err := New(&config)
+
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("Connects with url from env", func() {
+				config.Hosts = []Host{{URL: "${REDIS_URL}"}}
+
+				_, err := New(&config)
+
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("Returns error without password", func() {
+				config.Hosts = []Host{{Address: server.Addr()}}
+
+				_, err := New(&config)
+
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("Host", func() {
+		It("Unmarshals string, object and url entries", func() {
+			var config Config
+
+			err := yaml.Unmarshal([]byte(`
+hosts:
+  - legacy:6379
+  - address: tls-host:6379
+    password: ${REDIS_PASSWORD}
+    tls: true
+  - url: ${REDIS_URL}
+`), &config)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Hosts).To(Equal([]Host{
+				{Address: "legacy:6379"},
+				{Address: "tls-host:6379", Password: "${REDIS_PASSWORD}", TLS: true},
+				{URL: "${REDIS_URL}"},
+			}))
+		})
+
+		It("Sets TLS server name", func() {
+			opts, err := Host{Address: "tls-host:6379", TLS: true}.options()
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(opts.TLSConfig.ServerName).To(Equal("tls-host"))
+		})
+
+		DescribeTable("Rejects hosts that would fall back to localhost",
+			func(host Host) {
+				_, err := host.options()
+
+				Expect(err).To(HaveOccurred())
+			},
+			Entry("empty object", Host{}),
+			Entry("unset address env", Host{Address: "${REDIS_UNSET_ADDR}"}),
+			Entry("unset host in address", Host{Address: "${REDIS_UNSET_HOST}:6379"}),
+			Entry("unset url env", Host{URL: "${REDIS_UNSET_URL}"}),
+			Entry("unset host in url", Host{URL: "rediss://:pass@${REDIS_UNSET_HOST}:6379"}),
+		)
+
+		It("Does not leak url password in error", func() {
+			_, err := Host{URL: "rediss://:s3cret@:6379"}.options()
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).ToNot(ContainSubstring("s3cret"))
+		})
+
+		It("Enables TLS for rediss url", func() {
+			opts, err := Host{URL: "rediss://:pass@tls-host:6379"}.options()
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(opts.Password).To(Equal("pass"))
+			Expect(opts.TLSConfig.ServerName).To(Equal("tls-host"))
 		})
 	})
 
