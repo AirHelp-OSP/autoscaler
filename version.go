@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-var version = "development"
+var version string
 
 func versionString() string {
 	return fmt.Sprintf("Autoscaler version: %v", version)
