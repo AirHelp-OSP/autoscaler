@@ -7,8 +7,10 @@ WORKDIR /usr/app/src
 COPY go.mod go.sum ./
 RUN go mod tidy
 
+ARG VERSION=development
+
 COPY . .
-RUN go build
+RUN go build -ldflags "-X main.version=${VERSION}"
 
 FROM alpine
 
